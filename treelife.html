@@ -1,0 +1,122 @@
+<!DOCTYPE HTML>
+<html>
+  <style>
+    html, body {
+      width:  100%;
+      height: 100%;
+      margin: 0px;
+    }
+  </style>
+  <script language="javascript">
+  branchingfactor=11;
+
+  window.requestAnimFrame = (function(callback) {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function(callback) {
+              window.setTimeout(callback, 1000 / 60);
+            };
+  })();
+
+  sin60=Math.sin(Math.PI/3);
+
+  function dbg(text){
+	dbgdiv=document.getElementById('debug');
+	current=dbgdiv.innerHTML;
+	dbgdiv.innerHTML=current+"<br/>"+text
+  }
+
+  function rgbToHex(r, g, b) { //thanks stackoverflow
+	return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  var RNGOD = 1;
+  function random() {
+    var x = Math.sin(RNGOD+=10);
+    return (x+1)/2;
+  }
+
+  function line(ctx,x1,y1,x2,y2,color,width){
+    width=width||1;
+    ctx.beginPath();
+  	ctx.strokeStyle=color;
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+
+
+  //constants for treefrac2
+  lfrd=40;
+  lfgr=200;
+  lfbl=40;
+  branchfac=0.8;
+  wind=0.00;
+  function treefrac2(ctx,x1,y1,x2,y2,cnt,rd,gr,bl) {
+    line(ctx,x1,y1,x2,y2,rgbToHex(rd,gr,bl),cnt*1.5);
+    if (cnt>1) {
+      var sintr=Math.sin(-wind+Math.PI/(6+(random()*3)));
+      var costr=Math.cos(-wind+Math.PI/(6+(random()*3)));
+      var sints=Math.sin(wind+Math.PI/(6+(random()*3)));
+      var costs=Math.cos(wind+Math.PI/(6+(random()*3)));
+      var dx=branchfac*(x2-x1);
+      var dy=branchfac*(y2-y1);
+      var vx1=x1-(dx*costr+dy*sintr);
+      var vy1=y1-(dy*costr-dx*sintr);
+      var vx2=x1-(dx*costs-dy*sints);
+      var vy2=y1-(dy*costs+dx*sints);
+      var nrd=Math.round((lfrd-rd)*0.1)+rd;
+      var ngr=Math.round((lfgr-gr)*0.1)+gr;
+      var nbl=Math.round((lfbl-bl)*0.1)+bl;
+      treefrac2(ctx,vx1,vy1,x1,y1,cnt-1,nrd,ngr,nbl);
+      treefrac2(ctx,vx2,vy2,x1,y1,cnt-1,nrd,ngr,nbl);
+    }
+  }
+
+  function drawtree(){
+    wide=mcanvas.width;
+	high=mcanvas.height;
+	x=wide/2;
+	y=high/2;
+    ctx.clearRect(0, 0, wide, high);
+    treefrac2(ctx,x,y*1.6,x,y*1.9,branchingfactor,139,69,20);
+
+  }
+
+  moves=0;
+  function animate(){
+    moves+=0.02;
+    wind=Math.sin(moves*1.5)/20;
+    RNGOD = 0+moves;
+    drawtree();
+    requestAnimFrame(animate);
+  }
+
+
+  function paint(cnvname){
+	mcanvas = document.getElementById(cnvname);
+	ctx = mcanvas.getContext('2d');
+    ctx.canvas.width  = window.innerWidth;
+    ctx.canvas.height = window.innerHeight*0.95;
+	wide=mcanvas.width;
+	high=mcanvas.height;
+	x=wide/2;
+	y=high/2;
+    timerstart=Date.now();
+    animate();
+    timerend=Date.now();
+    dbg(timerend-timerstart);
+  }
+  </script>
+
+  <body onload='paint("mcanvas")'>
+	<div>
+	  <canvas id="mcanvas"></canvas>
+	</div>
+	<div id="debug"></div>
+  </body>
+</html>

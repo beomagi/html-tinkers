@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Particle Playground</title>
+    </head>
+    <script>
+
+        window.requestAnimFrame = (function(callback) {
+        return  window.requestAnimationFrame ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                window.oRequestAnimationFrame ||
+                window.msRequestAnimationFrame ||
+                function(callback) {
+                    window.setTimeout(callback, 1000 / 60);
+                };
+        })();
+
+        function min(a,b){if (a<b){return a;} else {return b}}
+        function max(a,b){if (a<b){return b;} else {return a}}
+
+        iter=0;
+        ix=0;iy=1;ir=2;ivx=3;ivy=4; // constants for index of particle properties
+        particles=[];
+        //array of x, y, radius, speedx, speedy
+        function wdbg(txt,flag){
+            if (flag==0) { dbgd.innerHTML=txt; } else { dbgd.innerHTML+=txt; }
+        }
+        function dot(x,y,r){
+            mctx.beginPath();
+            mctx.arc(x,y,r,0,2*Math.PI);
+            mctx.fillStyle="#FF0000";
+            mctx.fill();
+            mctx.stroke();
+        }
+        function force(a,b){ // calculate the force on item a, from object b
+            CA=400;CR=160;WR=10;        // constants force to attract and repel
+            ax=particles[a][0];
+            ay=particles[a][1];
+            ar=particles[a][2];
+            bx=particles[b][0];
+            by=particles[b][1];
+            br=particles[b][2];
+            mindist=(ar+br)*1.2;     // minimum distance is sum or radius
+            dx=bx-ax;dy=by-ay;
+            distsqr=dx*dx+dy*dy;        // square of midpoint distance
+            dist=Math.sqrt(distsqr);    // midpoint distance
+            if (dist<mindist) {dist=mindist;}
+            distsurf=dist-(ar+br);      // surface distance
+            distsurf2=distsurf*distsurf;// surface distance squared
+            dist3=dist*distsqr;         // cube of distance
+            attracty=(dy*CA)/dist3;
+            attractx=(dx*CA)/dist3;
+            repulsey=(dy*CR)/(distsurf2*dist);
+            repulsex=(dx*CR)/(distsurf2*dist);
+            wally2y=mcanv.height-ay;
+            wallx2x=mcanv.width-ax;
+            wallx2push=(WR)/(wallx2x*wallx2x);
+            wally2push=(WR)/(wally2y*wally2y);
+            wallx1push=(WR)/(ax*ax);
+            wally1push=(WR)/(ay*ay);
+            FX=(-repulsex+attractx)*(br/ar)-wallx2push+wallx1push;
+            FY=(-repulsey+attracty)*(br/ar)-wally2push+wally1push;
+            return [FX,FY];
+        }
+        function animate(){
+            iter+=1;
+            //wdbg("dbg "+iter+"<br/>",0);
+            mctx.clearRect(0, 0, mcanv.width, mcanv.height);
+            for (a=0;a<particles.length;a++){
+                dot(particles[a][0],particles[a][1],particles[a][2]);
+                //wdbg(particles[a][0].toPrecision(8)+","+particles[a][1].toPrecision(8)+","+particles[a][2].toPrecision(8)+"<br/>",1);
+            }
+            for (a=0;a<particles.length;a++){
+                var pfx=0;
+                var pfy=0;
+                for (b=0;b<particles.length;b++){
+                    if (a!=b){
+                        vect=force(a,b);
+                        pfx+=vect[0];
+                        pfy+=vect[1];
+                        if (pfx>50) {pfx=50;}
+                        if (pfy>50) {pfy=50;}
+                        if (pfx<-50) {pfx=-50;}
+                        if (pfy<-50) {pfy=-50;}
+                    }
+                }
+                particles[a][ivx]+=pfx;
+                particles[a][ivy]+=pfy;
+                particles[a][ix]+=particles[a][ivx];
+                particles[a][iy]+=particles[a][ivy];
+                boundx2=mcanv.width-5;
+                boundx1=5;
+                boundy2=mcanv.height-5;
+                boundy1=5;
+                if (particles[a][ix]>boundx2) {particles[a][ivx]*=-0.8;particles[a][ix]=boundx2;}
+                if (particles[a][iy]>boundy2) {particles[a][ivy]*=-0.8;particles[a][iy]=boundy2;}
+                if (particles[a][ix]<boundx1) {particles[a][ivx]*=-0.8;particles[a][ix]=boundx1;}
+                if (particles[a][iy]<boundy1) {particles[a][ivy]*=-0.8;particles[a][iy]=boundy1;}
+                if (Math.abs(particles[a][ivx]) > 1) {particles[a][ivx]*=0.95;} else {particles[a][ivx]*=0.999;}
+                if (Math.abs(particles[a][ivy]) > 1) {particles[a][ivy]*=0.95;} else {particles[a][ivy]*=0.999;}
+            }
+            //setTimeout(animate,1);
+            requestAnimFrame(animate);
+        }
+        function setups(){
+            mcanv = document.getElementById("particleboard");
+            mctx = mcanv.getContext("2d");
+            mctx.canvas.width  = window.innerWidth;
+            mctx.canvas.height = window.innerHeight*0.95;
+            mcenterx = mcanv.width/2;
+            mcentery = mcanv.height/2;
+            for (a=0;a<100;a++){
+                px=-200+400*Math.random()+mcenterx;
+                py=-200+400*Math.random()+mcentery;
+                particles.push([px,py,5+Math.random()*5,0,0]);
+            }
+            dbgd = document.getElementById("debugnfo");
+        }
+    </script>
+    <body onload="setups();animate()"; style="margin:0px;padding:0px;">
+        <canvas id="particleboard" style="border:1px solid #000000;"></canvas>
+        <div id="debugnfo"></div>
+    </body>
+</html>
