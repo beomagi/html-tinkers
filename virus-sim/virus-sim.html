@@ -190,12 +190,33 @@
   }
 
   moves=0;
+  var countdown=-1;
   function animate(){
     moves+=0.01;
     RNGOD = rndseed+moves;
     timerstart=Date.now();
     drawcities();
     drawstats();
+    if (healthy_count==0){
+      if (countdown<0) {
+        countdown=100;
+      }
+      if (countdown>0){
+        countdown-=1;
+      }
+      if (countdown==0){
+        countdown=-1;
+        cities=[];
+        people=[];
+        city_count=0;
+        people_count=0;
+        healthy_count=0;
+        infected_count=0;
+        initcities(7,0.1,0.25);
+        populatecities();
+        people[0].infected=1;
+      }
+    }
     timerend=Date.now();
     frametime=timerend-timerstart;
     requestAnimFrame(animate);
