@@ -1,0 +1,224 @@
+<!DOCTYPE HTML>
+<html>
+  <style> 
+    html, body {
+      width:  100%;
+      height: 100%;
+      margin: 0px;
+    }
+  </style>
+  <script language="javascript">
+  rndseed=1000;
+  inittime=Date.now();
+  
+  window.requestAnimFrame = (function(callback) {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function(callback) {
+              window.setTimeout(callback, 1000 / 60);
+            };
+  })();
+
+
+  function dbg(text){
+    dbgdiv=document.getElementById('debug');
+    current=dbgdiv.innerHTML;
+    dbgdiv.innerHTML=current+"<br/>"+text
+  }
+
+  function rgbToHex(r, g, b) { //thanks stackoverflow
+  	return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  var RNGOD = rndseed;
+  function random() {
+    var x = Math.sin(RNGOD+=100);
+    return (x+1)/2;
+  }
+
+
+  function mapx(midx, mscale, xco){ return midx+mscale*xco;}
+  function mapy(midy, mscale, yco){ return midy+mscale*yco;}
+
+  var cities=[];
+  var people=[];
+  var city_count=0;
+  var people_count=0;
+  var healthy_count=0;
+  var infected_count=0;
+  function initcities(citycount,citysizemin,citysizemax){
+    city_count=citycount;
+    for (i=0;i<citycount;i++){
+      var city = {};
+      city.x=Math.cos((i*2*Math.PI)/citycount)*0.7;
+      city.y=Math.sin((i*2*Math.PI)/citycount)*0.7;
+      city.size=Math.random()*(citysizemax-citysizemin)+citysizemin;
+      cities.push(city);
+    }    
+  }
+  function populatecities(){
+    for (i=0;i<city_count;i++){
+      citysize=cities[i].size;
+      population=citysize*citysize*500;
+      for (j=0;j<population;j++){
+        var person={};
+        person.posa=Math.random()*Math.PI*2;
+        person.posr=cities[i].size*0.95; //from 0.05 to 0.95 of city size
+        person.posrv1=Math.random()*2;
+        person.posrv2=(Math.random()*Math.PI*2);
+        person.posv=(Math.random()-0.5);
+        person.city=i;
+        person.movetocity=i;
+        person.infected=0;
+        person.moving=-1;
+        person.movingposr=0;
+        people.push(person);
+        people_count+=1;
+      }
+    }
+  }
+
+  initcities(7,0.1,0.25);
+  populatecities();
+  people[0].infected=1;
+
+  function circle(ctx,cx,cy,cr,color){
+    ctx.beginPath();
+    ctx.strokeStyle=color;
+    ctx.fillStyle = color;
+    ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.fill();
+  }
+
+  function dista(x1,y1,x2,y2){
+    return (x2-x1)*(x2-x1)+(y2-y1)*(y2-y1);
+  }
+
+  travelspeed=0.005;
+  infectionchance=0.05; //per frame if close
+  function drawcities(){
+    wide=mcanvas.width;
+	  high=mcanvas.height;
+	  mx=wide/2;
+    my=high/2;
+    ms=Math.min(mx,my);
+    ctx.clearRect(0, 0, wide, high);
+
+    citycolor=rgbToHex(140,220,255);
+    for (i=0;i<city_count;i++){      
+      cityx=mapx(mx,ms,cities[i].x);
+      cityy=mapy(my,ms,cities[i].y);
+      circle(ctx,cityx,cityy,cities[i].size*ms,citycolor);
+    }
+
+    personcolor=rgbToHex(100,100,105);
+    infectedcolor=rgbToHex(255,50,5);
+    //-- handle person movement
+    var chkpx=[]; //buffer with calculated people locations
+    var chkpy=[];
+    for (i=0;i<people_count;i++){
+      pcity=people[i].city;
+      pr=people[i].posr*Math.sin(moves*people[i].posrv1+people[i].posrv2); //radius of walk
+      pa=people[i].posa; //angle of walk
+      pv=people[i].posv; //speed of walk
+      cityx=mapx(mx,ms,cities[pcity].x); //to center walk around city
+      cityy=mapy(my,ms,cities[pcity].y);
+      px=cityx+Math.sin(pa)*pr*ms;
+      py=cityy+Math.cos(pa)*pr*ms;
+      if (people[i].moving>=0){ //if moving, calculate if at other city, and transition
+        pr2=people[i].movingposr*Math.sin(moves*people[i].posrv1+people[i].posrv2);
+        cityx2=mapx(mx,ms,cities[people[i].movetocity].x);
+        cityy2=mapy(my,ms,cities[people[i].movetocity].y);
+        px2=cityx2+Math.sin(pa)*pr2*ms;
+        py2=cityy2+Math.cos(pa)*pr2*ms;
+        px=px2*people[i].moving+px*(1-people[i].moving);
+        py=py2*people[i].moving+py*(1-people[i].moving);
+        people[i].moving+=travelspeed;
+        if (people[i].moving>=1){
+          people[i].city=people[i].movetocity;
+          people[i].moving=-1;
+          people[i].posr=people[i].movingposr;
+        }
+      }
+      pcolor=personcolor;
+      if (people[i].infected==1) { pcolor=infectedcolor; }
+      circle(ctx,px,py,0.01*ms,pcolor);
+      people[i].posa+=pv*0.05;
+      //-- travelocity stuff
+      if (people[i].city == people[i].movetocity){
+        if (Math.random()<0.0005){
+          people[i].movetocity=Math.floor(Math.random()*city_count);
+          if (people[i].city !== people[i].movetocity){
+            people[i].moving=0;
+            people[i].movingposr=cities[people[i].movetocity].size*0.95; //radius of new city
+          }
+        }
+      }
+      //-- traveling ^^
+      //--post move, check location for infection
+      chkpx.push(px);
+      chkpy.push(py);
+      infected_count=0;
+      healthy_count=0;
+      for (j=0;j<i;j++){
+        if (dista(px,py,chkpx[j],chkpy[j])<(ms*ms*0.0005)){
+          if (Math.random()<infectionchance){
+            people[i].infected=people[i].infected||people[j].infected;
+            people[j].infected=people[i].infected||people[j].infected;
+          }
+        }
+        if (people[j].infected==0){
+          healthy_count+=1;
+        } else {
+          infected_count+=1;
+        }
+      }
+      //--infection by locality ^^
+    }
+  }
+
+  function drawstats(){
+    fsz=Math.floor(ms/20);
+    ctx.font=fsz+"px courier";
+    ctx.fillStyle=rgbToHex(0,0,0);
+    ctx.fillText("Infected: "+infected_count,mx*0.9,my*0.8);
+    ctx.fillText("Healthy : "+healthy_count,mx*0.9,my*0.9);
+  }
+
+  moves=0;
+  function animate(){
+    moves+=0.01;
+    RNGOD = rndseed+moves;
+    timerstart=Date.now();
+    drawcities();
+    drawstats();
+    timerend=Date.now();
+    frametime=timerend-timerstart;
+    requestAnimFrame(animate);
+  }
+
+
+  function paint(cnvname){
+	  mcanvas = document.getElementById(cnvname);
+	  ctx = mcanvas.getContext('2d');
+    ctx.canvas.width  = window.innerWidth;
+    ctx.canvas.height = window.innerHeight*0.95;
+	  wide=mcanvas.width;
+	  high=mcanvas.height;
+	  x=wide/2;
+	  y=high/2;
+    animate();
+  }
+  </script>
+
+  <body onload='paint("mcanvas")'>
+	<div>
+	  <canvas id="mcanvas"></canvas>
+	</div>
+	<div id="debug"></div>
+  </body>
+</html>
