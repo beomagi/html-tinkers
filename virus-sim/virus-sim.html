@@ -99,6 +99,10 @@
   ievents=[];
   travelspeed=0.005;
   infectionchance=0.05; //per frame if close
+  gtime=0;
+  infecteventgraph=[];
+  previnfect_count=0;
+  infecteventgraph.push({"t":0,"v":0});
   function drawcities(){
     wide=mcanvas.width;
 	  high=mcanvas.height;
@@ -199,29 +203,50 @@
     ctx.font=fsz+"px courier";
     textoffset=ctx.measureText("Infected: 999").width
     ctx.fillStyle=rgbToHex(180,0,0);
-    ctx.fillText("Infected: "+infected_count,mx-textoffset/2,my*0.77);      
+    ctx.fillText("Infected: "+infected_count,mx-textoffset/2,my-ms*0.30);      
     ctx.fillStyle=rgbToHex(0,150,0);
-    ctx.fillText("Healthy : "+healthy_count,mx-textoffset/2,my*0.82 );      
+    ctx.fillText("Healthy : "+healthy_count,mx-textoffset/2,my-ms*0.25);      
 
     fsz=Math.floor(ms/30);
     ctx.font=fsz+"px courier";
     ctx.fillStyle=rgbToHex(190,90,190);
     textoffset=ctx.measureText("P infected to city xx").width
     for (id=0;id<ievents.length;id++){
-      ctx.fillText(ievents[id],mx-textoffset/2,my*0.90+(ms*id/30));      
+      ctx.fillText(ievents[id],mx-textoffset/2,my-ms*0.20+(ms*id/30));      
     }
+    ctx.beginPath();
+    ctx.strokeStyle=rgbToHex(90,90,90);
+    gxmin=mx-ms*0.2;
+    gxmax=gxmin+ms*0.4;
+    gymin=my+ms*0.25;
+    gymax=gymin-ms*0.2;
 
-
+    ctx.rect(gxmin,gymin,gxmax-gxmin,gymax-gymin);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(gxmin,gymin);
+    for (igc=0;igc<infecteventgraph.length;igc++){
+      gyval=gymin-((infecteventgraph[igc].v/infected_count)*(gymin-gymax));
+      gxval=gxmin+(gxmax-gxmin)*((infecteventgraph[igc].t)/gtime);
+      ctx.lineTo(gxval, gyval);
+    }
+    ctx.stroke();
   }
 
   moves=0;
   var countdown=-1;
   function animate(){
+    gtime+=1;
     moves+=0.01;
     RNGOD = rndseed+moves;
     timerstart=Date.now();
+    previnfect_count=infected_count;
     drawcities();
     drawstats();
+    if (infected_count>previnfect_count) {
+      infecteventgraph.push({"t":gtime,"v":infected_count});
+      previnfect_count=infected_count;
+    }
     if (healthy_count==0){
       if (countdown<0) {
         countdown=100;
@@ -239,7 +264,11 @@
         people_count=0;
         healthy_count=0;
         infected_count=0;
-        initcities(Math.floor(random()*6)+3,0.1,0.25);
+        previnfect_count=0;
+        gtime=0;
+        infecteventgraph=[];
+        infecteventgraph.push({"t":0,"v":0});
+        initcities(Math.floor(random()*7)+3,0.1,0.25);
         populatecities();
         people[Math.floor(random()*people_count)].infected=1;
       }
