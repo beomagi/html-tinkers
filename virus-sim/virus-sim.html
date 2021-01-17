@@ -47,8 +47,8 @@
     city_count=citycount;
     for (i=0;i<citycount;i++){
       var city = {};
-      city.x=Math.cos((i*2*Math.PI)/citycount)*0.7;
-      city.y=Math.sin((i*2*Math.PI)/citycount)*0.7;
+      city.x=Math.cos((i*2*Math.PI)/citycount)*0.74;
+      city.y=Math.sin((i*2*Math.PI)/citycount)*0.74;
       city.size=Math.random()*(citysizemax-citysizemin)+citysizemin;
       cities.push(city);
     }    
@@ -75,8 +75,9 @@
     }
   }
 
-//  initcities(7,0.1,0.25);
-  initcities(Math.floor(random()*6)+3,0.1,0.25);
+  //  initcities(7,0.1,0.25);
+  //initcities(Math.floor(random()*7)+4,0.1,0.25);
+  initcities(9,0.1,0.25);
 
   populatecities();
   people[Math.floor(random()*people_count)].infected=1;
@@ -109,8 +110,8 @@
     ctime+=0.001;
     citycolor=rgbToHex(140,220,255);
     for (i=0;i<city_count;i++){
-      cities[i].x=Math.cos(ctime+(i*2*Math.PI)/city_count)*0.7; //apply gentle rotation of the world!
-      cities[i].y=Math.sin(ctime+(i*2*Math.PI)/city_count)*0.7;
+      cities[i].x=Math.cos(ctime+(i*2*Math.PI)/city_count)*0.74; //apply gentle rotation of the world!
+      cities[i].y=Math.sin(ctime+(i*2*Math.PI)/city_count)*0.74;
       cityx=mapx(mx,ms,cities[i].x);
       cityy=mapy(my,ms,cities[i].y);
       circle(ctx,cityx,cityy,cities[i].size*ms,citycolor);
@@ -151,7 +152,7 @@
       people[i].posa+=pv*0.05;
       //-- travelocity stuff
       if (people[i].city == people[i].movetocity){
-        if (Math.random()<0.0005){
+        if (Math.random()<0.00025){
           people[i].movetocity=Math.floor(Math.random()*city_count);
           if (people[i].city !== people[i].movetocity){
             people[i].moving=0;
