@@ -22,21 +22,15 @@
             };
   })();
 
-
-  function dbg(text){
-    dbgdiv=document.getElementById('debug');
-    current=dbgdiv.innerHTML;
-    dbgdiv.innerHTML=current+"<br/>"+text
-  }
-
   function rgbToHex(r, g, b) { //thanks stackoverflow
   	return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   }
 
   var RNGOD = rndseed;
   function random() {
-    var x = Math.sin(RNGOD+=100);
-    return (x+1)/2;
+    //var x = Math.sin(RNGOD+=100);
+    //return (x+1)/2;
+    return Math.random()
   }
 
 
@@ -81,9 +75,11 @@
     }
   }
 
-  initcities(7,0.1,0.25);
+//  initcities(7,0.1,0.25);
+  initcities(Math.floor(random()*6)+3,0.1,0.25);
+
   populatecities();
-  people[0].infected=1;
+  people[Math.floor(random()*people_count)].infected=1;
 
   function circle(ctx,cx,cy,cr,color){
     ctx.beginPath();
@@ -98,6 +94,8 @@
     return (x2-x1)*(x2-x1)+(y2-y1)*(y2-y1);
   }
 
+  ctime=0
+  ievents=[];
   travelspeed=0.005;
   infectionchance=0.05; //per frame if close
   function drawcities(){
@@ -106,10 +104,13 @@
 	  mx=wide/2;
     my=high/2;
     ms=Math.min(mx,my);
-    ctx.clearRect(0, 0, wide, high);
-
+    ctx.fillStyle=rgbToHex(255,255,220);
+    ctx.fillRect(0,0,wide,high);
+    ctime+=0.001;
     citycolor=rgbToHex(140,220,255);
-    for (i=0;i<city_count;i++){      
+    for (i=0;i<city_count;i++){
+      cities[i].x=Math.cos(ctime+(i*2*Math.PI)/city_count)*0.7; //apply gentle rotation of the world!
+      cities[i].y=Math.sin(ctime+(i*2*Math.PI)/city_count)*0.7;
       cityx=mapx(mx,ms,cities[i].x);
       cityy=mapy(my,ms,cities[i].y);
       circle(ctx,cityx,cityy,cities[i].size*ms,citycolor);
@@ -155,6 +156,9 @@
           if (people[i].city !== people[i].movetocity){
             people[i].moving=0;
             people[i].movingposr=cities[people[i].movetocity].size*0.95; //radius of new city
+            if (people[i].infected==1) {
+              ievents.push("P"+i+" infected to city"+people[i].movetocity);
+            }
           }
         }
       }
@@ -167,8 +171,15 @@
       for (j=0;j<i;j++){
         if (dista(px,py,chkpx[j],chkpy[j])<(ms*ms*0.0005)){
           if (Math.random()<infectionchance){
-            people[i].infected=people[i].infected||people[j].infected;
-            people[j].infected=people[i].infected||people[j].infected;
+            if (people[j].infected==1 && people[i].infected==0){
+              people[i].infected=1;
+              ievents.push("P"+j+" infected P"+i);
+              if (ievents.length>8){ievents.shift();}
+            }
+            if (people[j].infected==0 && people[i].infected==1){
+              people[j].infected=1;
+              ievents.push("P"+i+" infected P"+j);
+            }
           }
         }
         if (people[j].infected==0){
@@ -179,14 +190,27 @@
       }
       //--infection by locality ^^
     }
+    while (ievents.length>8){ievents.shift();}
   }
 
   function drawstats(){
     fsz=Math.floor(ms/20);
     ctx.font=fsz+"px courier";
-    ctx.fillStyle=rgbToHex(0,0,0);
-    ctx.fillText("Infected: "+infected_count,mx*0.9,my*0.8);
-    ctx.fillText("Healthy : "+healthy_count,mx*0.9,my*0.9);
+    textoffset=ctx.measureText("Infected: 999").width
+    ctx.fillStyle=rgbToHex(180,0,0);
+    ctx.fillText("Infected: "+infected_count,mx-textoffset/2,my*0.77);      
+    ctx.fillStyle=rgbToHex(0,150,0);
+    ctx.fillText("Healthy : "+healthy_count,mx-textoffset/2,my*0.82 );      
+
+    fsz=Math.floor(ms/30);
+    ctx.font=fsz+"px courier";
+    ctx.fillStyle=rgbToHex(190,90,190);
+    textoffset=ctx.measureText("P infected to city xx").width
+    for (id=0;id<ievents.length;id++){
+      ctx.fillText(ievents[id],mx-textoffset/2,my*0.90+(ms*id/30));      
+    }
+
+
   }
 
   moves=0;
@@ -200,21 +224,23 @@
     if (healthy_count==0){
       if (countdown<0) {
         countdown=100;
+        ievents.push("-No healthy people-")
       }
       if (countdown>0){
         countdown-=1;
       }
-      if (countdown==0){
+      if (countdown==0){ //this is rest status
         countdown=-1;
         cities=[];
         people=[];
+        ievents=[];
         city_count=0;
         people_count=0;
         healthy_count=0;
         infected_count=0;
-        initcities(7,0.1,0.25);
+        initcities(Math.floor(random()*6)+3,0.1,0.25);
         populatecities();
-        people[0].infected=1;
+        people[Math.floor(random()*people_count)].infected=1;
       }
     }
     timerend=Date.now();
@@ -240,6 +266,5 @@
 	<div>
 	  <canvas id="mcanvas"></canvas>
 	</div>
-	<div id="debug"></div>
   </body>
 </html>
