@@ -214,16 +214,21 @@
     for (id=0;id<ievents.length;id++){
       ctx.fillText(ievents[id],mx-textoffset/2,my-ms*0.20+(ms*id/30));      
     }
-    ctx.beginPath();
-    ctx.strokeStyle=rgbToHex(90,90,90);
+    // Graph it!
     gxmin=mx-ms*0.2;
     gxmax=gxmin+ms*0.4;
     gymin=my+ms*0.25;
     gymax=gymin-ms*0.2;
-
+    ctx.beginPath();
+    ctx.strokeStyle=rgbToHex(90,90,90);
+    ctx.fillStyle=rgbToHex(255,255,255);
+    ctx.globalAlpha=0.5;
+    ctx.fillRect(gxmin,gymin,gxmax-gxmin,gymax-gymin);
+    ctx.globalAlpha=1;
     ctx.rect(gxmin,gymin,gxmax-gxmin,gymax-gymin);
     ctx.stroke();
     ctx.beginPath();
+    ctx.strokeStyle=rgbToHex(190,90,90);
     ctx.moveTo(gxmin,gymin);
     for (igc=0;igc<infecteventgraph.length;igc++){
       gyval=gymin-((infecteventgraph[igc].v/infected_count)*(gymin-gymax));
@@ -231,6 +236,7 @@
       ctx.lineTo(gxval, gyval);
     }
     ctx.stroke();
+    //End of graphing ^^
   }
 
   moves=0;
