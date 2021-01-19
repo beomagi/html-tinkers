@@ -1,0 +1,228 @@
+<!DOCTYPE HTML>
+<html>
+  <style> 
+    html, body {
+      width:  100%;
+      height: 100%;
+      margin: 0px;
+    }
+    #mcanvas {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+  <script language="javascript">
+  inittime=Date.now();
+  
+  window.requestAnimFrame = (function(callback) {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function(callback) {
+              window.setTimeout(callback, 1000 / 60);
+            };
+  })();
+
+  function rgbToHex(r, g, b) { //thanks stackoverflow
+  	return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+  
+  function random() {
+    return Math.random()
+  }
+
+  function mapx(midx, mscale, xco){ return midx+mscale*xco;}
+  function mapy(midy, mscale, yco){ return midy+mscale*yco;}
+
+  function circle(ctx,cx,cy,cr,color){
+    ctx.beginPath();
+    ctx.strokeStyle=color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 1;
+    ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.fill();
+  }
+  function line(ctx,x1,y1,x2,y2,color,width){
+    width=width||1;
+    ctx.beginPath();
+	  ctx.strokeStyle=color;
+    ctx.lineWidth = width;
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+  }
+
+  forcemag=100;
+  function torque3point(fx,fy,px,py,sx,sy){
+    //                                                                                             
+    //                   + ix, iy                                                                
+    //                     .                                                                        
+    //               px,py   +                                                                       
+    //                    .       .                                                               
+    //                 .               +  sx,sy                                                         
+    //              .                                                                               
+    //    fx,fy   +                                                                                  
+    //                                                                                             
+    dxfp=px-fx;
+    dyfp=py-fy;
+    mfp=dyfp/dxfp;
+    angleofarm=Math.atan(mfp);
+    dxps=px-sx;
+    dyps=py-sy;
+    mps=dyps/dxps;
+    angleofappliedforce=Math.atan(mps);
+    magresultantforce=Math.abs(Math.sin(angleofarm-angleofappliedforce));
+    clockwise=1;
+    cps=py-mps*px;
+    cfp=fy-mfp*fx;
+    if (cps>cfp) {
+      clockwise=-1;
+    } else {
+      if (cfp == -Infinity){
+        clockwise=-1;
+      }
+    }
+    flipside=Math.sign(sx-fx)||1;
+    clockwise=-(flipside*Math.sign(dxfp)*clockwise)||1;
+    dsquared_ps=dxps*dxps+dyps*dyps;
+    distance=Math.sqrt(dsquared_ps);
+    distancesurface=distance-ms/10;
+    force=1/(distancesurface*distancesurface); //raw force is 1/dd
+    return forcemag*force*magresultantforce*clockwise;
+  }
+
+  spinners=[];
+
+  function drawspinner(spsize, spinnerindex){
+    spx=spinners[spinnerindex].spx;
+    spy=spinners[spinnerindex].spy;
+    sparmcount=spinners[spinnerindex].armcount;
+    spinnercolor=spinners[spinnerindex].color;
+    sprotation=spinners[spinnerindex].angle;
+    spnsiz=spsize/4;
+    armsiz=spsize/10;
+    pi=Math.PI;
+    pi2=2*pi;
+    for (scntr=0;scntr<sparmcount;scntr++){
+      armx=spx-Math.sin(sprotation+pi2*scntr/sparmcount)*spnsiz;
+      army=spy+Math.cos(sprotation+pi2*scntr/sparmcount)*spnsiz;
+      spinners[spinnerindex].arms[scntr].cx=armx;
+      spinners[spinnerindex].arms[scntr].cy=army;
+      circle(ctx,armx,army,armsiz,spinnercolor);
+      line(ctx,spx,spy,armx,army,spinnercolor,armsiz);      
+    }
+  }
+
+  function setup1spinner(spx,spy,sparmcount,spsize,rot,scolor){
+    spnsiz=spsize/4;
+    armsiz=spsize/10;
+    aspinner={};
+    aspinner.mass=1+sparmcount;
+    aspinner.armcount=sparmcount;
+    aspinner.spx=spx;
+    aspinner.spy=spy;
+    aspinner.rspeed=0;
+    aspinner.angle=rot;
+    aspinner.color=scolor;
+    aspinner.arms=[];
+    pi=Math.PI;
+    pi2=2*pi;
+    for (scntr=0;scntr<sparmcount;scntr++){
+      armx=spx-Math.sin(rot+pi2*scntr/sparmcount)*spnsiz;
+      army=spy+Math.cos(rot+pi2*scntr/sparmcount)*spnsiz;
+      aspinner.arms.push({"x":armx,"y":army,"cx":armx,"cy":army})
+    }
+    spinners.push(aspinner);
+  }  
+
+  function clearscreen(){
+    ctx.fillStyle=rgbToHex(255,255,255);
+    ctx.fillRect(0,0,wide,high);
+  }
+
+  maxspeed=0.1;
+  minspeed=-maxspeed;
+  function forcecalculations(s1, s2){ // get forces of s1 on s2 and apply to spinner s2
+    spAx=spinners[s1].spx; //spinner center points
+    spAy=spinners[s1].spy;
+    spBx=spinners[s2].spx;
+    spBy=spinners[s2].spy;
+    for (armBcntr=0;armBcntr<spinners[s2].armcount;armBcntr+=1){ // for each arm of s2
+      ax2=spinners[s2].arms[armBcntr].cx;
+      ay2=spinners[s2].arms[armBcntr].cy;
+      torque=0;
+      for (armAcntr=0;armAcntr<spinners[s1].armcount;armAcntr+=1){ // for each arm of s1
+        ax1=spinners[s1].arms[armAcntr].cx;
+        ay1=spinners[s1].arms[armAcntr].cy;
+        //line(ctx,ax1,ay1,ax2,ay2,rgbToHex(160,160,0),1);
+        //ax1,ay1 applies a force on ax2, ay2 around a fulcrum spBx, spBy
+        //determine turning turning force, left/right and sum it up for overall torque
+        torque+=torque3point(spBx, spBy, ax2, ay2, ax1, ay1);
+      }
+      spinners[s2].rspeed+=torque;
+      spinners[s2].rspeed=Math.max(minspeed,spinners[s2].rspeed);
+      spinners[s2].rspeed=Math.min(maxspeed,spinners[s2].rspeed);
+    }
+  }
+
+  function rotatespinners(spinnernumber){
+    rspeed=spinners[spinnernumber].rspeed;
+    spinners[spinnernumber].angle+=rspeed;
+  }
+
+  framecount=0;
+  function animate(){
+    framecount+=1; //timer of sorts
+    timerstart=Date.now();
+    tangle=framecount/100;
+    clearscreen();
+    //------------------
+    spinners[0].angle+=0.05;
+    for (si=1;si<spinners.length;si++){ // draw spinners. 
+      drawspinner(ms,si);
+    }
+    for (sk=1;sk<spinners.length;sk++){ // calculate forces. sk starts at 0 to include fixed
+      for (sj=1;sj<spinners.length;sj++){
+        if (sk!=sj){
+          forcecalculations(sk,sj);
+        }
+      }
+    }
+    for (si=1;si<spinners.length;si++){ // si start at 0 to include fixed
+      rotatespinners(si);
+    }
+    //------------------
+    timerend=Date.now();
+    frametime=timerend-timerstart;
+    requestAnimFrame(animate);
+  }
+
+  function paint(cnvname){
+	  mcanvas = document.getElementById(cnvname);
+	  ctx = mcanvas.getContext('2d');
+    ctx.canvas.width  = window.innerWidth;
+    ctx.canvas.height = window.innerHeight*0.95;
+    ctx.imageSmoothingEnabled = true;
+	  wide=mcanvas.width;
+	  high=mcanvas.height;
+	  mx=wide/2;
+	  my=high/2;
+    ms=Math.min(mx,my);
+    setup1spinner(mx,my,3,ms,0,rgbToHex(100+random()*100,150+random()*100,150+random()*100));
+    spinset=5;
+    for (si=0;si<spinset;si++){ // create n="spinset" spinners
+      spinx=Math.sin(-01+pi2*si/spinset)*ms*0.65;
+      spiny=-Math.cos(-01+pi2*si/spinset)*ms*0.65;
+      setup1spinner(mx+spinx,my+spiny,3,ms,-4,rgbToHex(200-Math.sin(si)*50,200-Math.sin(si+2)*50,200-si*10));
+    }
+    animate();
+  }
+  </script>
+
+  <body onload='paint("mcanvas")'>
+	  <canvas id="mcanvas"></canvas>
+  </body>
+</html>
