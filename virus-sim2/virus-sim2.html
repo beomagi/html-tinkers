@@ -1,0 +1,215 @@
+<!DOCTYPE HTML>
+<html>
+  <style>
+    html, body {
+      width:  100%;
+      height: 100%;
+      margin: 0px;
+      border: 0px;
+      padding: 0px;
+      overflow: hidden;
+    }
+  </style>
+  <script language="javascript">
+    var ctx=null;
+    var inittime=Date.now();
+    var maxwidth=0;
+    var maxheight=0;
+    var midwidth=0;
+    var midheight=0;
+    var squarescaler=0;
+    var counter=0;
+    var move=0;
+    var direction=0.001;
+    //cities
+    var cities=[];
+    var phase=0;
+
+    //takes rgb and converts to single int color, then to hex
+    function rgbToHex(r, g, b) { //thanks stackoverflow
+      return "#" + ((1 << 24) + (parseInt(r) << 16) + (parseInt(g) << 8) + parseInt(b)).toString(16).slice(1);
+    }
+
+    //function for basic lines
+    function line(x1,y1,x2,y2,color,width){
+      width=width||1;
+      ctx.beginPath();
+      ctx.strokeStyle=color;
+      ctx.moveTo(x1,y1);
+      ctx.lineTo(x2,y2);
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+
+    //function for basic lines
+    function circle(cx,cy,cr,color){
+      ctx.beginPath();
+      ctx.strokeStyle=color;
+      ctx.fillStyle = color;
+      ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.fill();
+    }
+
+    function drawcity(cx,cy,cr,col1,col2){
+      ctx.beginPath();
+      ctx.strokeStyle=col1;
+      ctx.fillStyle=col2;
+      ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.fill();
+    }
+
+    function tlx(xv){ return (xv*squarescaler)+midwidth; }
+    function tly(yv){ return (yv*squarescaler)+midheight; }
+
+    function initstuff(){
+      setupcities();
+      animate();      
+    }
+
+    function animate(){
+      set_height_width_vars();
+      reset_background();
+      drawcities();
+      if (phase==0){
+        normalizecityforces();
+        actuponcityforces();
+      }
+      requestAnimFrame(animate);
+    }
+
+
+    function reset_background(){
+      ctx.fillStyle=rgbToHex(10,30,30);
+      ctx.fillRect(0,0,maxwidth,maxheight);//background rectangle
+      ctx.fillStyle=rgbToHex(230,230,200);
+      ctx.fillRect(midwidth-squarescaler,midheight-squarescaler,squarescaler*2,squarescaler-1);//center rect
+      ctx.fillStyle=rgbToHex(200,230,230);
+      ctx.fillRect(midwidth-squarescaler,midheight,squarescaler*2,squarescaler);//center rect
+    }
+
+    function drawcities(){
+      for (let cidx = 0; cidx < cities.length; cidx++) {
+        drawcity( tlx(cities[cidx].x),
+                  tly(cities[cidx].y-0.5),
+                  cities[cidx].r*squarescaler,
+                  cities[cidx].col1,cities[cidx].col2);
+        drawcity( tlx(cities[cidx].x),
+                  tly(cities[cidx].y+0.5),
+                  cities[cidx].r*squarescaler,
+                  cities[cidx].col1,cities[cidx].col2);
+      }
+    }
+
+    function setupcities(){
+      phase=0;
+      cities=[];
+      maxcities=20;
+      citycount=3+Math.floor(Math.random()*(maxcities-2));
+      for (let cidx = 0; cidx < maxcities; cidx++) {
+        city={};
+        city.x=-0.5+Math.random();
+        city.y=(-0.5+(cidx/maxcities))*0.5;
+        city.r=0.05+Math.random()/10;
+        city.dx=0;
+        city.dy=0;
+        city.col1=rgbToHex(50+50*Math.random(),50+50*Math.random(),0);
+        city.col2=rgbToHex(150+50*Math.random(),150+50*Math.random(),150+50*Math.random());
+        cities.push(city);
+      }
+    }
+
+    function dist(x1,y1,x2,y2){
+	    return Math.sqrt(Math.pow(x2-x1,2)+Math.pow(y2-y1,2));
+    }
+
+    function normalizecityforces(){
+      for (let cidx1 = 0; cidx1 < maxcities; cidx1++) {
+        cities[cidx1].dx=0;
+        cities[cidx1].dy=0;
+        for (let cidx2 = 0; cidx2 < maxcities; cidx2++) {
+          if (cidx2 !== cidx1) {
+            citydistance=dist(  cities[cidx1].x,cities[cidx1].y,
+                                cities[cidx2].x,cities[cidx2].y);
+            citydistance=Math.max(citydistance-(cities[cidx1].r+cities[cidx2].r),0.00000001);
+            forcemultiplier=1/Math.pow(citydistance,2);
+            cities[cidx1].dx+=(cities[cidx1].x-cities[cidx2].x)*forcemultiplier;
+            cities[cidx1].dy+=(cities[cidx1].y-cities[cidx2].y)*forcemultiplier;
+          }
+        }
+        distfromedge_lef=Math.max(+1.0+(cities[cidx1].x-cities[cidx1].r),0.0000001);
+        distfromedge_rig=Math.max(+1.0-(cities[cidx1].x+cities[cidx1].r),0.0000001);
+        distfromedge_top=Math.max(+0.5+(cities[cidx1].y-cities[cidx1].r),0.0000001);
+        distfromedge_bot=Math.max(+0.5-(cities[cidx1].y+cities[cidx1].r),0.0000001);
+        cities[cidx1].dx+=1/Math.pow(distfromedge_lef,2);//force from left edge
+        cities[cidx1].dx-=1/Math.pow(distfromedge_rig,2);//force from right edge
+        cities[cidx1].dy+=1/Math.pow(distfromedge_top,2);//force from left edge
+        cities[cidx1].dy-=1/Math.pow(distfromedge_bot,2);//force from right edge
+        
+      }
+    }
+
+    function actuponcityforces(){
+      var maxmag=0;
+      for (let cidx = 0; cidx < maxcities; cidx++) {
+        maxmag=Math.max(dist(0,0,cities[cidx].dx,cities[cidx].dy),maxmag);
+      }
+
+      for (let cidx = 0; cidx < maxcities; cidx++) {
+        forcemag=dist(0,0,cities[cidx].dx,cities[cidx].dy);
+        if (forcemag>1){
+          cities[cidx].dx=cities[cidx].dx/(maxmag*0.5);
+          cities[cidx].dy=cities[cidx].dy/(maxmag*0.5);
+        }
+        cities[cidx].x=cities[cidx].x+cities[cidx].dx/1000;
+        cities[cidx].y=cities[cidx].y+cities[cidx].dy/1000;
+        if ((cities[cidx].x+cities[cidx].r)>1) cities[cidx].x=1-cities[cidx].r;
+        if ((cities[cidx].y+cities[cidx].r)>0.5) cities[cidx].y=0.5-cities[cidx].r;
+        if ((cities[cidx].x-cities[cidx].r)<-1) cities[cidx].x=-1+cities[cidx].r;
+        if ((cities[cidx].y-cities[cidx].r)<-0.5) cities[cidx].y=-0.5+cities[cidx].r;
+      }
+    }
+
+    function set_height_width_vars(){
+      //get canvas width and height
+      ctx.canvas.width  = window.innerWidth;
+      ctx.canvas.height = window.innerHeight*1;
+      //keep useful variables
+      //maximum canvas height, width
+      maxwidth=mcanvas.width;
+      maxheight=mcanvas.height;
+      //middle canvas height, width
+      midwidth=mcanvas.width/2;
+      midheight=mcanvas.height/2;
+      //represents the half the length of a side of the biggest
+      //square that fits a rectangular screen
+      squarescaler=Math.min(midwidth,midheight);
+    }
+
+    function paint(cnvname){
+      mcanvas = document.getElementById(cnvname);
+      ctx = mcanvas.getContext('2d');
+      initstuff();
+    }
+
+    window.requestAnimFrame = (function(callback) {
+      return  window.requestAnimationFrame ||
+              window.webkitRequestAnimationFrame ||
+              window.mozRequestAnimationFrame ||
+              window.oRequestAnimationFrame ||
+              window.msRequestAnimationFrame ||
+              function(callback) {
+                window.setTimeout(callback, 1000 / 60);
+              };
+    })();
+
+  </script>
+
+  <body onload='paint("mcanvas")'>
+	<div>
+	  <canvas id="mcanvas"></canvas>
+	</div>
+	<div id="debug"></div>
+  </body>
+</html>
