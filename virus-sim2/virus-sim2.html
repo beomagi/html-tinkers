@@ -8,6 +8,9 @@
       border: 0px;
       padding: 0px;
       overflow: hidden;
+      font-size: 0.8em;
+      font-family: 'Courier New', Courier, monospace;
+      cursor: pointer;
     }
   </style>
   <script language="javascript">
@@ -21,9 +24,22 @@
     var counter=0;
     var move=0;
     var direction=0.001;
+    //info div
+    var infodiv=null;
+    var infodiv_drag=null;
+    var infodiv_info=null;
+    var statuswindowposX = 0, statuswindowposY = 0;
     //cities
     var cities=[];
     var phase=0;
+    var cityincity=false;
+    var cityarranging=true;
+    var movementrate=0;
+    //people
+    var peoplearranging=false;
+    var people=[];
+    //time
+    var timer=0;
 
     //takes rgb and converts to single int color, then to hex
     function rgbToHex(r, g, b) { //thanks stackoverflow
@@ -64,18 +80,33 @@
     function tly(yv){ return (yv*squarescaler)+midheight; }
 
     function initstuff(){
+      infodiv_drag=document.getElementById('details')
+      infodiv=document.getElementById('details_main')
+      infodiv_info=document.getElementById('maininfoarea')
+      document.getElementById('details_min').onclick=function(){
+        disp=infodiv_info.style.display;
+        if (disp !== "none") {
+          infodiv_info.style.display="none";
+        } else {
+          infodiv_info.style.display="block";
+        }
+      }
+      dragstatuswindow(infodiv_drag);
       setupcities();
-      animate();      
+      animate();
+      infodiv_info.innerHTML+="<br/>City generation...";
     }
 
     function animate(){
+      timer+=1;
       set_height_width_vars();
       reset_background();
+      if (cityarranging){ normalizecityforces(); actuponcityforces(); }
+      if (peoplearranging) {populate();}
+      hospitaldrift();
       drawcities();
-      if (phase==0){
-        normalizecityforces();
-        actuponcityforces();
-      }
+      movepeople();
+      drawpeople();
       requestAnimFrame(animate);
     }
 
@@ -100,24 +131,150 @@
                   cities[cidx].r*squarescaler,
                   cities[cidx].col1,cities[cidx].col2);
       }
+      ctx.fillStyle=rgbToHex(240,220,220);
+      ctx.textAlign = "center";
+      ctx.font = "7em Consolas";      
+      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y-0.46));
+      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y+0.54));
+    }
+
+
+    var pcol1=rgbToHex(10,10,10);
+    var pcol2=rgbToHex(80,80,120);
+    function drawperson(px,py){
+      ctx.beginPath();
+      ctx.strokeStyle=pcol1;
+      ctx.fillStyle=pcol2;
+      ctx.arc(px, py, squarescaler/200, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.fill();
+    }
+    function drawpeople(){
+      for (let pidx = 0; pidx < people.length; pidx++){
+        stpx=tlx(people[pidx].sx);
+        stpy=tly(people[pidx].sy);
+        utpx=tlx(people[pidx].ux);
+        utpy=tly(people[pidx].uy);
+        if (people[pidx].salive) drawperson(stpx,stpy-squarescaler/2);
+        if (people[pidx].ualive) drawperson(utpx,utpy+squarescaler/2);
+      }
+    }
+
+
+    function calc_personxy(city,offset,rvelocity,radius1, radius2, radialoffset, timingoffset){
+      cityx=cities[city].x;
+      cityy=cities[city].y;
+      gobetween=Math.pow(Math.sin(offset*rvelocity),2);
+      sr=radius1*gobetween+(1-(gobetween))*radius2;
+      p_ox=Math.sin(radialoffset+timingoffset*cities[city].r)*cities[city].r*0.95*sr;
+      p_oy=Math.cos(radialoffset+timingoffset*cities[city].r)*cities[city].r*0.95*sr;
+      x=cityx+p_ox;
+      y=cityy+p_oy;
+      return ({"x":x,"y":y});
+    }
+
+    function movepeople(){
+      for (let pidx = 0; pidx < people.length; pidx++){
+        person=people[pidx];
+
+        person.soffset+=0.01*person.direction;
+        person.uoffset+=0.01*person.direction;
+
+        sxy=calc_personxy(person.scity, person.soffset, person.srv, person.sr, person.sr2, person.sradoffset, person.soffset);
+        person.sx=sxy.x;
+        person.sy=sxy.y;
+
+        uxy=calc_personxy(person.ucity, person.uoffset, person.urv, person.ur, person.ur2, person.uradoffset, person.uoffset);
+        person.ux=uxy.x;
+        person.uy=uxy.y;
+
+        if (person.stcity>-1) {
+          if ((person.stprogress<1)&&(person.stduration>timer)){
+            person.stprogress+=0.005;
+          }
+          if ((person.stprogress>0)&&(person.stduration<timer)){
+            person.stprogress-=0.005;
+            person.sreturning=true;
+          }
+          stxy=calc_personxy(person.stcity, person.soffset, person.srv, person.sr, person.sr2, person.sradoffset, person.soffset);
+          person.sx=sxy.x*(1-person.stprogress)+stxy.x*person.stprogress;
+          person.sy=sxy.y*(1-person.stprogress)+stxy.y*person.stprogress;
+          if ((person.stprogress<=0)&&(person.sreturning)) {
+            person.stprogress=0;
+            person.sreturning=false;
+            person.stcity=-1;
+          }
+        }
+
+        if (person.utcity>-1) {
+          if ((person.utprogress<1)&&(person.utduration>timer)){
+            person.utprogress+=0.005;
+          }
+          if ((person.utprogress>0)&&(person.utduration<timer)){
+            person.utprogress-=0.005;
+            person.ureturning=true;
+          }
+          utxy=calc_personxy(person.utcity, person.uoffset, person.urv, person.ur, person.ur2, person.uradoffset, person.uoffset);
+          person.ux=uxy.x*(1-person.utprogress)+utxy.x*person.utprogress;
+          person.uy=uxy.y*(1-person.utprogress)+utxy.y*person.utprogress;
+          if ((person.utprogress<=0)&&(person.ureturning)) {
+            person.utprogress=0;
+            person.ureturning=false;
+            person.utcity=-1;
+          }
+        }
+
+
+        if (person.travelchance > Math.random()*2000){
+          if ((person.stcity==-1)&&(person.utcity==-1)){
+            traveltocity=Math.floor(Math.random()*(maxcities-1));
+            duration=timer+Math.random()*2000+220;
+            if (traveltocity !== person.scity){
+              person.stcity=traveltocity;
+              person.stprogress=0;
+              person.stduration=duration;
+            }
+            if (traveltocity !== person.ucity){
+              person.utcity=traveltocity;
+              person.utprogress=0;
+              person.utduration=duration;
+            }
+          }
+        }
+
+      }
     }
 
     function setupcities(){
       phase=0;
+      cityarranging=true;
       cities=[];
-      maxcities=20;
+      maxcities=3+Math.random()*8;
+      maxcities=8;
       citycount=3+Math.floor(Math.random()*(maxcities-2));
       for (let cidx = 0; cidx < maxcities; cidx++) {
         city={};
-        city.x=-0.5+Math.random();
-        city.y=(-0.5+(cidx/maxcities))*0.5;
-        city.r=0.05+Math.random()/10;
+        city.x=-0.5+Math.random(); //-0.5 to 0.5
+        city.y=-0.25+Math.random()*0.5; //-0.25 to 0.25
+        city.r=0.075+0.15*Math.pow((1+cidx)/maxcities,3);
         city.dx=0;
         city.dy=0;
+        city.ishospital=false;
         city.col1=rgbToHex(50+50*Math.random(),50+50*Math.random(),0);
         city.col2=rgbToHex(150+50*Math.random(),150+50*Math.random(),150+50*Math.random());
         cities.push(city);
       }
+      city={};
+      city.x=-0.5+Math.random();
+      city.y=-0.25+Math.random()*0.5;
+      city.r=0.075+0.15*Math.pow(0.5,3);
+      city.dx=0;
+      city.dy=0;
+      city.ishospital=true;
+      city.col1=rgbToHex(250,25+50*Math.random(),25+50*Math.random());
+      city.col2=rgbToHex(200+50*Math.random(),100+50*Math.random(),100+50*Math.random());
+      cities.push(city);
+      maxcities+=1;
     }
 
     function dist(x1,y1,x2,y2){
@@ -125,6 +282,8 @@
     }
 
     function normalizecityforces(){
+      peoplearranging=false;
+      cityincity=false;
       for (let cidx1 = 0; cidx1 < maxcities; cidx1++) {
         cities[cidx1].dx=0;
         cities[cidx1].dy=0;
@@ -132,7 +291,8 @@
           if (cidx2 !== cidx1) {
             citydistance=dist(  cities[cidx1].x,cities[cidx1].y,
                                 cities[cidx2].x,cities[cidx2].y);
-            citydistance=Math.max(citydistance-(cities[cidx1].r+cities[cidx2].r),0.00000001);
+            if (citydistance-(cities[cidx1].r+cities[cidx2].r) <= 0) cityincity=true;
+            citydistance=Math.max(citydistance-(cities[cidx1].r+cities[cidx2].r),0.000000001);
             forcemultiplier=1/Math.pow(citydistance,2);
             cities[cidx1].dx+=(cities[cidx1].x-cities[cidx2].x)*forcemultiplier;
             cities[cidx1].dy+=(cities[cidx1].y-cities[cidx2].y)*forcemultiplier;
@@ -142,33 +302,98 @@
         distfromedge_rig=Math.max(+1.0-(cities[cidx1].x+cities[cidx1].r),0.0000001);
         distfromedge_top=Math.max(+0.5+(cities[cidx1].y-cities[cidx1].r),0.0000001);
         distfromedge_bot=Math.max(+0.5-(cities[cidx1].y+cities[cidx1].r),0.0000001);
-        cities[cidx1].dx+=1/Math.pow(distfromedge_lef,2);//force from left edge
-        cities[cidx1].dx-=1/Math.pow(distfromedge_rig,2);//force from right edge
-        cities[cidx1].dy+=1/Math.pow(distfromedge_top,2);//force from left edge
-        cities[cidx1].dy-=1/Math.pow(distfromedge_bot,2);//force from right edge
-        
+        cities[cidx1].dx+=1.5/Math.pow(distfromedge_lef,2);//force from left edge
+        cities[cidx1].dx-=1.5/Math.pow(distfromedge_rig,2);//force from right edge
+        cities[cidx1].dy+=1.5/Math.pow(distfromedge_top,2);//force from left edge
+        cities[cidx1].dy-=1.5/Math.pow(distfromedge_bot,2);//force from right edge
       }
     }
 
+    function hospitaldrift(){
+      for (let cidx = 0; cidx < maxcities; cidx++) {
+        if (cities[cidx].hashospital) {
+          cities[cidx].hospitaloffset+=0.0001/cities[cidx].r;
+        }
+      }
+    }
     function actuponcityforces(){
       var maxmag=0;
       for (let cidx = 0; cidx < maxcities; cidx++) {
         maxmag=Math.max(dist(0,0,cities[cidx].dx,cities[cidx].dy),maxmag);
       }
-
+      var slowdown=100;
+      if (cityincity) slowdown=20;
+      movementrate=0
       for (let cidx = 0; cidx < maxcities; cidx++) {
         forcemag=dist(0,0,cities[cidx].dx,cities[cidx].dy);
-        if (forcemag>1){
-          cities[cidx].dx=cities[cidx].dx/(maxmag*0.5);
-          cities[cidx].dy=cities[cidx].dy/(maxmag*0.5);
+        if (forcemag>0.01){
+          cities[cidx].dx=cities[cidx].dx/(maxmag);
+          cities[cidx].dy=cities[cidx].dy/(maxmag);
         }
-        cities[cidx].x=cities[cidx].x+cities[cidx].dx/1000;
-        cities[cidx].y=cities[cidx].y+cities[cidx].dy/1000;
+        cities[cidx].l2x=cities[cidx].lx;
+        cities[cidx].l2y=cities[cidx].ly;
+        cities[cidx].lx=cities[cidx].x;
+        cities[cidx].ly=cities[cidx].y;
+        cities[cidx].x=cities[cidx].x+cities[cidx].dx/slowdown;
+        cities[cidx].y=cities[cidx].y+cities[cidx].dy/slowdown;
         if ((cities[cidx].x+cities[cidx].r)>1) cities[cidx].x=1-cities[cidx].r;
         if ((cities[cidx].y+cities[cidx].r)>0.5) cities[cidx].y=0.5-cities[cidx].r;
         if ((cities[cidx].x-cities[cidx].r)<-1) cities[cidx].x=-1+cities[cidx].r;
         if ((cities[cidx].y-cities[cidx].r)<-0.5) cities[cidx].y=-0.5+cities[cidx].r;
+        cities[cidx].movementrate=dist(cities[cidx].x,cities[cidx].y,cities[cidx].l2x,cities[cidx].l2y);
+        if (cities[cidx].movementrate > movementrate) movementrate=cities[cidx].movementrate;
       }
+      if (maxmag<10000) {
+        if (movementrate<0.001) {cityarranging=false;phase=1;peoplearranging=true;}
+      }
+    }
+
+    function populate(){
+      infodiv_info.innerHTML+="<br/>Populating...";
+      for (let cidx = 0; cidx < maxcities-1; cidx++) {
+        popcount=Math.pow(cities[cidx].r,2)*2000;
+        popcount=popcount*(Math.random()*0.5+0.5);//limit density randomly
+        for (let pidx = 0; pidx < popcount; pidx++) {          
+          person={};
+          citypick=cidx;
+          person.scity=citypick;
+          person.ucity=citypick;
+          person.stcity=-1;
+          person.stduration=-1;
+          person.stprogress=0;
+          person.utcity=-1;
+          person.utduration=-1;
+          person.utprogress=0;
+          person.age=Math.random()*Math.random()*110;//age may affect fatality
+          person.direction=Math.random()*2-1;//Person moves in a particular direction
+          person.travelchance=Math.pow(Math.random(),2)//non uniform chance to travel
+
+          person.soffset=Math.random()*Math.PI*2;//movement is modelled on trig, this is offset for up to a full period
+          person.uoffset=person.soffset;
+          person.followslockdown=Math.random(); //how strictly person follows safety procedures
+          person.sx=0;//safe x
+          person.sy=0;
+          person.sr=Math.sqrt(Math.random());//keeps people out of somewhat clustered center
+          person.sr2=Math.sqrt(Math.random());//person moves between a couple radius in daily movement
+          person.srv=Math.sqrt(Math.random());//how fast they move
+          person.sradoffset=Math.random()*Math.PI*2;
+          person.salive=true;
+
+          person.ux=0;//unsafe x
+          person.uy=0;
+          person.ur=person.sr;
+          person.ur2=person.sr2;
+          person.urv=person.srv;
+          person.uradoffset=person.sradoffset;
+          person.st=-1;//safe travel destination
+          person.ut=-1;//unsafesafe travel destination
+          person.ualive=true;
+          people.push(person);
+        }
+      }
+      phase+=1;
+      peoplearranging=false;
+      infodiv_info.innerHTML+=people.length+" people exist!";
     }
 
     function set_height_width_vars(){
@@ -203,13 +428,52 @@
                 window.setTimeout(callback, 1000 / 60);
               };
     })();
+    
+    //////////////modified from https://www.w3schools.com/howto/howto_js_draggable.asp////////////////
+    function dragstatuswindow(elmnt) {    
+        elmnt.onmousedown = statusdragMouseDown;
+    }
+    function statusdragMouseDown(e) {
+          e = e || window.event; e.preventDefault();
+          statuswindowposX = e.clientX; statuswindowposY = e.clientY;
+          document.onmouseup = statuscloseDragElement;
+          document.onmousemove = statusDragging;
+    }
+    function statusDragging(e) {
+          e = e || window.event;
+          e.preventDefault();
+          statusmidx=infodiv.offsetWidth/2;
+          statusmidy=infodiv.offsetHeight/2;
+          statuswindowposX = e.clientX-statusmidx;
+          statuswindowposY = e.clientY-statusmidy;
+          top_pos=statuswindowposY;
+          top_pos=Math.max(top_pos,0);top_pos=Math.min(top_pos,document.body.offsetHeight-2*statusmidy);
+          left_pos=statuswindowposX;
+          left_pos=Math.max(left_pos,0);left_pos=Math.min(left_pos,document.body.offsetWidth-2*statusmidx);
+          infodiv.style.top = (top_pos) + "px";
+          infodiv.style.left = (left_pos) + "px";
+    }
+    function statuscloseDragElement() {
+          document.onmousemove = null;
+          infodiv_drag.onmousedown = statusdragMouseDown;
+    }
 
   </script>
 
   <body onload='paint("mcanvas")'>
-	<div>
-	  <canvas id="mcanvas"></canvas>
-	</div>
-	<div id="debug"></div>
+	<div><canvas id="mcanvas"></canvas></div>
+  <div id="details_main" style="
+        position: absolute;
+        top: 0px;left: 0px;
+        border-width: 0px;padding: 0.25em;
+        background-color: #600000;color:#ffffff;
+        font-size: 1em;font-family: 'Courier New', Courier, monospace;
+  ">
+  <div id="details" style="background-color:#900000;width:49%;color:#ffffff;float:left;Text-align:center">&nbsp;<>&nbsp;</div>
+  <div id="details_min" style="background-color:#900000;width:49%;color:#ffffff;float:right;Text-align:center">&nbsp;-&nbsp;</div>
+  <div id="maininfoarea" style="width:100%;height:100%;float:right;">
+    Starting...
+  </div>
+  </div>
   </body>
 </html>
