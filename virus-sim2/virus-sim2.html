@@ -8,7 +8,7 @@
       border: 0px;
       padding: 0px;
       overflow: hidden;
-      font-size: 0.8em;
+      font-size: 0.9em;
       font-family: 'Courier New', Courier, monospace;
       cursor: pointer;
     }
@@ -34,8 +34,9 @@
     var phase=0;
     var cityincity=false;
     var cityarranging=true;
-    var movementrate=0;
+    var movementrate=0;    
     //people
+    var peoplegenerated=false;
     var peoplearranging=false;
     var people=[];
     //time
@@ -101,8 +102,8 @@
       timer+=1;
       set_height_width_vars();
       reset_background();
-      if (cityarranging){ normalizecityforces(); actuponcityforces(); }
-      if (peoplearranging) {populate();}
+      if (cityarranging){ normalizecityforces(); actuponcityforces();}      
+      if ((peoplearranging) && (peoplegenerated==false)) {populate();}
       hospitaldrift();
       drawcities();
       movepeople();
@@ -133,9 +134,10 @@
       }
       ctx.fillStyle=rgbToHex(240,220,220);
       ctx.textAlign = "center";
-      ctx.font = "7em Consolas";      
-      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y-0.46));
-      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y+0.54));
+      Hsize=squarescaler/70;
+      ctx.font = Hsize+"em Consolas";      
+      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y-0.45));
+      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y+0.55));
     }
 
 
@@ -342,9 +344,13 @@
         if ((cities[cidx].y-cities[cidx].r)<-0.5) cities[cidx].y=-0.5+cities[cidx].r;
         cities[cidx].movementrate=dist(cities[cidx].x,cities[cidx].y,cities[cidx].l2x,cities[cidx].l2y);
         if (cities[cidx].movementrate > movementrate) movementrate=cities[cidx].movementrate;
-      }
+      }      
       if (maxmag<10000) {
-        if (movementrate<0.001) {cityarranging=false;phase=1;peoplearranging=true;}
+        if (movementrate<0.001) {
+          cityarranging=false;
+          phase=1;
+          peoplearranging=true;
+        }
       }
     }
 
@@ -392,8 +398,9 @@
         }
       }
       phase+=1;
+      peoplegenerated=true;
       peoplearranging=false;
-      infodiv_info.innerHTML+=people.length+" people exist!";
+      infodiv_info.innerHTML+=people.length+" people exist!<br/>";
     }
 
     function set_height_width_vars(){
@@ -469,8 +476,8 @@
         background-color: #600000;color:#ffffff;
         font-size: 1em;font-family: 'Courier New', Courier, monospace;
   ">
-  <div id="details" style="background-color:#900000;width:49%;color:#ffffff;float:left;Text-align:center">&nbsp;<>&nbsp;</div>
-  <div id="details_min" style="background-color:#900000;width:49%;color:#ffffff;float:right;Text-align:center">&nbsp;-&nbsp;</div>
+  <div id="details" style="background-color:#900000;width:49%;color:#ffffff;float:left;Text-align:center">&nbsp;[drag]&nbsp;</div>
+  <div id="details_min" style="background-color:#900000;width:49%;color:#ffffff;float:right;Text-align:center">&nbsp;[fold]&nbsp;</div>
   <div id="maininfoarea" style="width:100%;height:100%;float:right;">
     Starting...
   </div>
