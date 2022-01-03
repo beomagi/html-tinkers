@@ -41,6 +41,8 @@
     var people=[];
     //time
     var timer=0;
+    //disease
+    var diseases=[];
 
     //takes rgb and converts to single int color, then to hex
     function rgbToHex(r, g, b) { //thanks stackoverflow
@@ -115,9 +117,9 @@
     function reset_background(){
       ctx.fillStyle=rgbToHex(10,30,30);
       ctx.fillRect(0,0,maxwidth,maxheight);//background rectangle
-      ctx.fillStyle=rgbToHex(230,230,200);
-      ctx.fillRect(midwidth-squarescaler,midheight-squarescaler,squarescaler*2,squarescaler-1);//center rect
       ctx.fillStyle=rgbToHex(200,230,230);
+      ctx.fillRect(midwidth-squarescaler,midheight-squarescaler,squarescaler*2,squarescaler-1);//center rect
+      ctx.fillStyle=rgbToHex(230,230,200);
       ctx.fillRect(midwidth-squarescaler,midheight,squarescaler*2,squarescaler);//center rect
     }
 
@@ -131,23 +133,37 @@
                   tly(cities[cidx].y+0.5),
                   cities[cidx].r*squarescaler,
                   cities[cidx].col1,cities[cidx].col2);
+        if (cidx<cities.length-1){
+          ctx.fillStyle=rgbToHex(240,220,220);
+          ctx.textAlign = "center";
+          Hsize=cities[cidx].r*squarescaler/10;
+          ctx.font = Hsize+"em Consolas";
+          ctx.fillText(cidx, tlx(cities[cidx].x), tly(cities[cidx].r/2.5+cities[cidx].y-0.5));
+          ctx.fillText(cidx, tlx(cities[cidx].x), tly(cities[cidx].r/2.5+cities[cidx].y+0.5));
+        }
       }
       ctx.fillStyle=rgbToHex(240,220,220);
       ctx.textAlign = "center";
       Hsize=squarescaler/70;
-      ctx.font = Hsize+"em Consolas";      
-      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y-0.45));
-      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y+0.55));
+      ctx.font = Hsize+"em Consolas";
+      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y-0.445));
+      ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y+0.555));
     }
 
 
     var pcol1=rgbToHex(10,10,10);
-    var pcol2=rgbToHex(80,80,120);
-    function drawperson(px,py){
+    var pcol1t=rgbToHex(0,180,0);
+    var pcol2=rgbToHex(80,80,80);
+    function drawperson(px,py,travelling){
       ctx.beginPath();
-      ctx.strokeStyle=pcol1;
+      ctx.lineWidth=2;
+      if (travelling>0){
+        ctx.strokeStyle=pcol1t;
+      }else{
+        ctx.strokeStyle=pcol1;
+      }
       ctx.fillStyle=pcol2;
-      ctx.arc(px, py, squarescaler/200, 0, 2 * Math.PI);
+      ctx.arc(px, py, squarescaler/150, 0, 2 * Math.PI);
       ctx.stroke();
       ctx.fill();
     }
@@ -157,8 +173,8 @@
         stpy=tly(people[pidx].sy);
         utpx=tlx(people[pidx].ux);
         utpy=tly(people[pidx].uy);
-        if (people[pidx].salive) drawperson(stpx,stpy-squarescaler/2);
-        if (people[pidx].ualive) drawperson(utpx,utpy+squarescaler/2);
+        if (people[pidx].salive) drawperson(stpx,stpy-squarescaler/2,people[pidx].stprogress);
+        if (people[pidx].ualive) drawperson(utpx,utpy+squarescaler/2,people[pidx].utprogress);
       }
     }
 
@@ -247,12 +263,35 @@
       }
     }
 
+    function createdisease(){
+      disease={}
+      disease.killrate=0.08;
+      disease.killrate_withcare=0.02;
+      disease.killrate_vaccinated=0.02;
+      disease.killrate_vaccinatedwithcare=0.005;
+      disease.badrate=0.2;
+      disease.badrate_vaccinated=0.08;
+      disease.timetillcontagious_min=2;//assume days, can be multiplied internally to make more sense later
+      disease.timetillcontagious_max=4;
+      disease.timetillbad_min=5; //Person can be destined for
+      disease.timetillbad_max=15; //mild case, bad case (needs hospital)
+      disease.timetillwell_min=5; //deadly case, will kill, lower chance in hospital
+      disease.timetillwell_max=40;      
+      disease.timetilldeath_min=8;
+      disease.timetilldeath_max=40;
+      disease.contagious_threshold=0.25; // should be this sick to be contagious
+      disease.spreadability=0.5;
+      disease.maskblockrate=0.05; //chance of mask to prevent entry of disease to person
+      disease.maskcontainrate=0.9; //chance of mask to prevent spreading of disease from person
+      disease.vaccineeffectiveness=0.85;
+    }
+
     function setupcities(){
       phase=0;
       cityarranging=true;
       cities=[];
-      maxcities=3+Math.random()*8;
-      maxcities=8;
+      maxcities=3+Math.floor(Math.random()*8);
+      //maxcities=8;
       citycount=3+Math.floor(Math.random()*(maxcities-2));
       for (let cidx = 0; cidx < maxcities; cidx++) {
         city={};
@@ -364,12 +403,7 @@
           citypick=cidx;
           person.scity=citypick;
           person.ucity=citypick;
-          person.stcity=-1;
-          person.stduration=-1;
-          person.stprogress=0;
-          person.utcity=-1;
-          person.utduration=-1;
-          person.utprogress=0;
+
           person.age=Math.random()*Math.random()*110;//age may affect fatality
           person.direction=Math.random()*2-1;//Person moves in a particular direction
           person.travelchance=Math.pow(Math.random(),2)//non uniform chance to travel
@@ -384,6 +418,14 @@
           person.srv=Math.sqrt(Math.random());//how fast they move
           person.sradoffset=Math.random()*Math.PI*2;
           person.salive=true;
+          person.stcity=-1; //safe travel to city
+          person.stduration=-1; // trip duration
+          person.stprogress=0; // trip progression
+          person.ssicklevel=0;
+          person.sdisease=-1;
+          person.ssick_timetillcontagious=-1;
+          person.ssick_timetillwell=-1;
+          person.ssick_timetilldead=-1;
 
           person.ux=0;//unsafe x
           person.uy=0;
@@ -394,6 +436,15 @@
           person.st=-1;//safe travel destination
           person.ut=-1;//unsafesafe travel destination
           person.ualive=true;
+          person.utcity=-1; //unsafe travel to city
+          person.utduration=-1; // trip duration
+          person.utprogress=0; // trip progression
+          person.usicklevel=0;
+          person.udisease=-1;
+          person.usick_timetillcontagious=-1;
+          person.usick_timetillwell=-1;
+          person.usick_timetilldead=-1;
+
           people.push(person);
         }
       }
