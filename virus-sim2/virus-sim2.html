@@ -257,9 +257,9 @@
       ctx.fillStyle=pcolor;
       ctx.arc(px, py, squarescaler/150, 0, 2 * Math.PI);
       if (dist(px,py,mousePos.x,mousePos.y)<3) return true;
-      /*ctx.stroke();  //useful over head debug text thing
+      ctx.stroke();
       ctx.fill();
-      ctx.fillStyle=rgbToHex(0,0,0);
+      /*ctx.fillStyle=rgbToHex(0,0,0);  //useful over head debug text thing
       ctx.textAlign = "center";
       Hsize=squarescaler/500;
       ctx.font = Hsize+"em Consolas";
