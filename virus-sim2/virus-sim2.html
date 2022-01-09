@@ -156,7 +156,6 @@
     function tlx(xv){ return (xv*squarescaler)+midwidth; }
     function tly(yv){ return (yv*squarescaler)+midheight; }
 
-
     function pausefunction(){
       paused=!paused;
     }
@@ -169,11 +168,11 @@
       mcanvas = document.getElementById("mcanvas");
       ctx = mcanvas.getContext('2d');
 
-      infodiv_drag=document.getElementById('details')
-      infodiv=document.getElementById('details_main')      
-      infodiv_info=document.getElementById('maininfoarea')
-      infodiv_infopersonal=document.getElementById('maininfoareapersonal')
-      //infodiv.style.width='33%';
+      infodiv_drag=document.getElementById('details');
+      infodiv=document.getElementById('details_main');
+      infodiv_info=document.getElementById('maininfoarea');
+      infodiv_infopersonal=document.getElementById('maininfoareapersonal');
+      infotooltip=document.getElementById('slidertooltip');
       infodiv.style.width='min-content';
       dragstatuswindow(infodiv_drag);
       setupcities();
@@ -281,15 +280,20 @@
       if (persongoingto==maxcities-1) persongoingto="Hospital";
       if (person.stcity >=0) {
         persontravelinfo=("P-"+pidx)+" is "+ ((person.stprogress*100).toFixed())+"% way to "+persongoingto;
-        personvisitinfo=" - "+(person.stduration.toFixed()-timer)+" time left";
+        personvisitinfo=" - "+((person.stduration-timer)/daymultiplier).toFixed(2)+" time left";
         if (person.sreturning){
-          persontravelinfo=("P-"+pidx)+" is "+ ((-person.stprogress*100).toFixed())+"% way from "+persongoingto;
+          persontravelinfo=("P-"+pidx)+" is "+ ((person.stprogress*100).toFixed())+"% way from "+persongoingto;
           personvisitinfo="";
         }
       } else {
         persontravelinfo=("P-"+pidx)+ " is not travelling";
       }
       sicklevel=person.phase[0];
+      if (!person.salive) {
+        document.getElementById("maininfoareapersonal").innerHTML="Not following anyone";
+        followingperson={"n":-1,"ab":-1};
+        return;
+      }
       if (sicklevel==0) sickstate="Healthy";
       phasetime=0;
       if (sicklevel==1) {sickstate="Getting sick";phasetime=person.ssick_timetillcontagious}
@@ -317,6 +321,12 @@
       pdetail=worldsafe+"<br/>"+persontravelinfo+" "+personvisitinfo;
       pdetail=pdetail+"<br/>"+sickstate;
       pdetail=pdetail+"<br/>Resistance level - "+person.resist.toFixed(3);
+      maskinfo="Will not wear a mask in this world";
+      if (followingperson.ab==0) {
+        maskinfo="Will not wear masks"
+        if (person.maskchance < masklikeliness) maskinfo="Will wear a mask if required";
+      }
+      pdetail=pdetail+"<br/>"+maskinfo;
       document.getElementById("maininfoareapersonal").innerHTML=pdetail;
       //linehere
       px=person.sx;
@@ -367,7 +377,7 @@
         utpx=tlx(peopleB[pidx].sx);
         utpy=tly(peopleB[pidx].sy);
         puma=false;
-        pumb=false;        
+        pumb=false;
         if (peopleA[pidx].salive) puma=drawperson(stpx,stpy-squarescaler/2,peopleA[pidx].stprogress,peopleA[pidx].phase[0],"");
         if (peopleB[pidx].salive) pumb=drawperson(utpx,utpy+squarescaler/2,peopleB[pidx].stprogress,peopleB[pidx].phase[0],"");
         if (puma) personundermouse={"n":pidx,"ab":0}
@@ -417,7 +427,7 @@
             if (person.stprogress>=1 && person.stcity==maxcities-1){//if person is AT hospital
               stat.checkin+=1;
             }
-            if ((person.stprogress<1)&&(person.stduration>timer)&&(!person.hospitalized)&&(person.stcity<maxcities-1)){
+            if ((person.stprogress<1)&&(person.stduration>timer)&&(person.stcity<maxcities-1)){
               person.stprogress+=0.005;
             }
             if ((person.stprogress<1)&&(person.stduration>timer)&&(person.hospitalized)&&person.stcity==maxcities-1){
@@ -731,6 +741,16 @@
       phase=0;
       cityarranging=true;
       cities=[];
+      peopleA=[];
+      peopleB=[];
+      diseases=[];
+      domasks=false;
+      dovaccinations=false;
+      peoplearranging=false;
+      peoplegenerated=false;
+      initinfection=false;
+      paused=false;
+      timer=0;
       maxcities=3+Math.floor(Math.random()*8);
       //maxcities=8;
       citycount=3+Math.floor(Math.random()*(maxcities-2));
@@ -918,7 +938,6 @@
       phase+=1;
       peoplegenerated=true;
       peoplearranging=false;
-      infodiv_info.innerHTML+=peopleA.length+" people exist!<br/>";
     }
 
     function set_height_width_vars(){
@@ -953,8 +972,9 @@
     })();
     
 
-    function slider(name,id, min, max, step){
-      line="<div class=\"cfgent\">"+name+" : <span class=\"slideval\" id=\""+id+"_v\"></span><input type=\"range\" min=\""+min+"\" max=\""+max+"\" step=\""+step+"\" name=\""+id+"\" id=\""+id+"\" class=\"slider\"></div>";
+    function slider(text,id, min, max, step){
+      divid=id+"_div"
+      line="<div class=\"cfgent\" id=\""+divid+"\" name=\""+divid+"\">"+text+" : <span class=\"slideval\" id=\""+id+"_v\"></span><input type=\"range\" min=\""+min+"\" max=\""+max+"\" step=\""+step+"\" name=\""+id+"\" id=\""+id+"\" class=\"slider\"></div>";
       return line;
     }
 
@@ -965,6 +985,18 @@
         document.getElementById(name+"_v").innerHTML=document.getElementById(name).value;
       })
       document.getElementById(name).onchange=onchangefunc;
+    }
+
+
+    function tooltip_slide(slideid,text){
+      divid=slideid+"_div";
+      tooltip(divid,text);
+    }
+
+    function tooltip(divid,text){
+      divele=document.getElementById(divid);
+      divele.onmouseleave=function(){infotooltip.innerHTML="";}
+      divele.onmousemove=function(){infotooltip.innerHTML="<br/>------------------------------------------------------<br/>"+text;}
     }
 
     function controlpaneldiv(){
@@ -1012,7 +1044,7 @@
       time2hcmax_html+
       rate_vac_html+
       rate_msk_html+
-      "<br/>";
+      "<br/>------------------------------------------------------<br/>";
       controlpanelcreated=true;
       slideinit("irate",diseases[0].spreadability*60,function(){diseases[0].spreadability=document.getElementById("irate").value/60});
       slideinit("brate",diseases[0].badrate,function(){diseases[0].badrate=document.getElementById("brate").value;});
@@ -1020,18 +1052,46 @@
       slideinit("drateh",diseases[0].killrate_withcare,function(){diseases[0].killrate_withcare=document.getElementById("drateh").value});
       slideinit("dratev",diseases[0].killrate_vaccinated,function(){diseases[0].killrate_vaccinated=document.getElementById("dratev").value});
       slideinit("dratehv",diseases[0].killrate_vaccinatedwithcare,function(){diseases[0].killrate_vaccinatedwithcare=document.getElementById("dratehv").value});
-      slideinit("time2skmin",diseases[0].timetillcontagious_min,function(){diseases[0].timetillcontagious_min=document.getElementById("time2skmin")});
-      slideinit("time2skmax",diseases[0].timetillcontagious_max,function(){diseases[0].timetillcontagious_max=document.getElementById("time2skmax")});
-      slideinit("time2bdmin",diseases[0].timetillbad_min,function(){diseases[0].timetillbad_min=document.getElementById("time2bdmin")});
-      slideinit("time2bdmax",diseases[0].timetillbad_max,function(){diseases[0].timetillbad_max=document.getElementById("time2bdmax")});
-      slideinit("time2ddmin",diseases[0].timetilldeath_min,function(){diseases[0].timetilldeath_min=document.getElementById("time2ddmin")});
-      slideinit("time2ddmax",diseases[0].timetilldeath_max,function(){diseases[0].timetilldeath_max=document.getElementById("time2ddmax")});
-      slideinit("time2wlmin",diseases[0].timetillwell_min,function(){diseases[0].timetillwell_min=document.getElementById("time2wlmin");diseases[0].timebad2sick_min=document.getElementById("time2wlmin")});
-      slideinit("time2wlmax",diseases[0].timetillwell_max,function(){diseases[0].timetillwell_max=document.getElementById("time2wlmax");diseases[0].timebad2sick_max=document.getElementById("time2wlmin")});
-      slideinit("time2hcmin",diseases[0].gethelp_min,function(){diseases[0].gethelp_min=document.getElementById("time2hcmin")});
-      slideinit("time2hcmax",diseases[0].gethelp_max,function(){diseases[0].gethelp_max=document.getElementById("time2hcmax")});
-      slideinit("vrate",vaccinelikeliness,function(){vaccinelikeliness=document.getElementById("vrate")});
-      slideinit("mrate",masklikeliness,function(){masklikeliness=document.getElementById("mrate")});
+      slideinit("time2skmin",diseases[0].timetillcontagious_min,function(){diseases[0].timetillcontagious_min=document.getElementById("time2skmin").value});
+      slideinit("time2skmax",diseases[0].timetillcontagious_max,function(){diseases[0].timetillcontagious_max=document.getElementById("time2skmax").value});
+      slideinit("time2bdmin",diseases[0].timetillbad_min,function(){diseases[0].timetillbad_min=document.getElementById("time2bdmin").value});
+      slideinit("time2bdmax",diseases[0].timetillbad_max,function(){diseases[0].timetillbad_max=document.getElementById("time2bdmax").value});
+      slideinit("time2ddmin",diseases[0].timetilldeath_min,function(){diseases[0].timetilldeath_min=document.getElementById("time2ddmin").value});
+      slideinit("time2ddmax",diseases[0].timetilldeath_max,function(){diseases[0].timetilldeath_max=document.getElementById("time2ddmax").value});
+      slideinit("time2wlmin",diseases[0].timetillwell_min,function(){diseases[0].timetillwell_min=document.getElementById("time2wlmin").value;diseases[0].timebad2sick_min=document.getElementById("time2wlmin")});
+      slideinit("time2wlmax",diseases[0].timetillwell_max,function(){diseases[0].timetillwell_max=document.getElementById("time2wlmax").value;diseases[0].timebad2sick_max=document.getElementById("time2wlmin")});
+      slideinit("time2hcmin",diseases[0].gethelp_min,function(){diseases[0].gethelp_min=document.getElementById("time2hcmin").value});
+      slideinit("time2hcmax",diseases[0].gethelp_max,function(){diseases[0].gethelp_max=document.getElementById("time2hcmax").value});
+      slideinit("vrate",vaccinelikeliness,function(){vaccinelikeliness=document.getElementById("vrate").value});
+      slideinit("mrate",masklikeliness,function(){masklikeliness=document.getElementById("mrate").value});
+      tooltip_slide("irate","Every frame that an infecter person is near another is a chance to infect. This slider increases the chance of infection.");
+      tooltip_slide("brate","Infections can become serious. A bad infection can make a person seek medical attention.");
+      tooltip_slide("drate","Infections can prove fatal. This slider is the chance without any healthcare or resistance."+
+      "The outcome is decided ahead of time. A fatal infection will always have a serious phase.");
+      tooltip_slide("drateh","A known fatal rate with medical care means we can estimate that a given person that needs medical care has a chance to survive. "+
+      "e.g. a 50% rate without care and 10% rate with care, means chance of a person that will pass on has a 40%/50% chance to survive once "+
+      "they get to the hospital.");
+      tooltip_slide("dratev","Vaccinations reduce the rate of dying. This is not an on-off switch. The approximation here is that it offers a resistance. "+
+      "having the disease and getting over it also confers resistance. Resistance decays over time. Decay rate from vaccination is lower, and the "+
+      "initial resistance is higher. This is just a model, and not intended to accurately represent a specific infectious disease.<br/><br/>"+
+      "Assuming chance of an infection's contraction or seriousness is C and the chance with perfect resistance is CR:<br/>"+
+      "Calculated chance = C*(1-resist)+CR*resist<br/>"+
+      "With no resistance, base chance (C) alone is used. At best, the better chance CR is used.");
+      tooltip_slide("dratehv","This rate is used for dying patients with resistance that go to a hospital.");
+      tooltip_slide("time2skmin","At the time of infection a person doesn't know it. This is the minimum incubation period. A sick person is not "+
+      "contagious at only this point.");
+      tooltip_slide("time2skmax","At the time of infection a person doesn't know it. This is the maximum incubation period. A sick person is not "+
+      "contagious at only this point.");
+      tooltip_slide("time2bdmin","Where it is calculated that a person will have a serious case, this is the minimum time from being sick, to serious.");
+      tooltip_slide("time2bdmax","Where it is calculated that a person will have a serious case, this is the maximum time from being sick, to serious.");
+      tooltip_slide("time2ddmin","Where it is calculated that a person will have a fatal case, this is the minimum time from being serious.");
+      tooltip_slide("time2ddmax","Where it is calculated that a person will have a fatal case, this is the maximum time from being serious.");
+      tooltip_slide("time2wlmin","This is the mimimum time from sick/serious phase to being well.");
+      tooltip_slide("time2wlmax","This is the maximum time from sick/serious phase to being well.");
+      tooltip_slide("time2hcmin","Not everyone goes to a hospital immidiately. There's always hesitation. This is the minimum hesitation.");
+      tooltip_slide("time2hcmax","Not everyone goes to a hospital immidiately. There's always hesitation. This is the maximum hesitation.");
+      tooltip_slide("vrate","Everyone generated has a uniform random value for their willingness to vaccinate. If it's less that this value, they will take the vaccine.");
+      tooltip_slide("mrate","Everyone generated has a uniform random value for their willingness to weak masks. If it's less that this value, they will wear masks.");
     }
 
     //////////////modified from https://www.w3schools.com/howto/howto_js_draggable.asp////////////////
@@ -1081,11 +1141,13 @@
         background-color: #600000;color:#ffffff;
         font-size: 1em;font-family: 'Courier New', Courier, monospace;
   ">
-  <div id="details" style="background-color:#900000;width:max-content;color:#ffffff;float:left;Text-align:center">---------[drag and expand, space to pause]---------</div>
+  <div id="details" style="background-color:#900000;width:max-content;color:#ffffff;float:left;Text-align:center">---------[mouse to open/drag, space to pause]---------</div>
   <div id="maininfoarea" style="width:100%;height:100%;float:right;">
     Starting...
   </div>
+  <br/>
   <div id="maininfoareapersonal" style="width:100%;height:100%;float:right;">Click to follow person</div>
+  <div id="slidertooltip" style="width:100%;height:100%;float:right;"></div>
   </div>
   </body>
 </html>
