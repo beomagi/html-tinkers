@@ -13,7 +13,7 @@
       cursor: pointer;
     }
     #details_main {
-      width:  25%;
+      width:  33%;
       margin: 0px;
       border: 0px;
       padding: 0px;
@@ -34,7 +34,7 @@
       width: 15%;
     }
     .slider {
-      width: 25%;
+      width: 30%;
       float: right;
       background: #000000;
       color:#ffffff;
@@ -73,10 +73,12 @@
     var move=0;
     var direction=0.001;
     var mousePos={"x":0,"y":0};
+    var paused=false;
     //info div
     var infodiv=null;
     var infodiv_drag=null;
     var infodiv_info=null;
+    var infodiv_infopersonal=null;
     var statuswindowposX = 0, statuswindowposY = 0;
     var controlpanelcreated=false;
     //cities
@@ -95,6 +97,8 @@
     var Hospitalmax=5; //maximum unmber of people at hospital
     var Hospitaltransmissionreduction=0.05;//reduce spread if at hospital
     var personundermouse={"n":-1,"ab":-1};
+    var followingperson=Object.assign({},personundermouse)
+    var persondetails="";
     //time
     var timer=0;
     //disease
@@ -120,7 +124,7 @@
     }
 
     //function for basic lines
-    function line(x1,y1,x2,y2,color,width){
+    function drawline(x1,y1,x2,y2,color,width){
       width=width||1;
       ctx.beginPath();
       ctx.strokeStyle=color;
@@ -152,52 +156,69 @@
     function tlx(xv){ return (xv*squarescaler)+midwidth; }
     function tly(yv){ return (yv*squarescaler)+midheight; }
 
+
+    function pausefunction(){
+      paused=!paused;
+    }
+
+    function keypressed(keyevt){
+      if (keyevt.keyCode==32) pausefunction();
+    }
+
     function initstuff(){
+      mcanvas = document.getElementById("mcanvas");
+      ctx = mcanvas.getContext('2d');
+
       infodiv_drag=document.getElementById('details')
       infodiv=document.getElementById('details_main')      
       infodiv_info=document.getElementById('maininfoarea')
-      infodiv_info.style.display="none";
-      infodiv.style.width='10%';
+      infodiv_infopersonal=document.getElementById('maininfoareapersonal')
+      //infodiv.style.width='33%';
+      infodiv.style.width='min-content';
       dragstatuswindow(infodiv_drag);
       setupcities();
       disease=createdisease();
       diseases.push(disease);
-      //mcanvas.onclick=followperson(mousePos.x,mousePos.y);
 
+      document.addEventListener('keydown', function(evt){keypressed(evt)}, false);
+      mcanvas.addEventListener('mousedown', function(evt) {
+        followperson();
+      }, false);
       mcanvas.addEventListener('mousemove', function(evt) {
-        var mousePos = getMousePos(mcanvas, evt);
-        var message = 'Mouse position: ' + mousePos.x + ',' + mousePos.y;
+        mousePos = getMousePos(mcanvas, evt);
       }, false);
 
       infodiv.onmouseover=function(){
         infodiv_info.style.display="block";
-        infodiv.style.width='25%';
+        //infodiv.style.width='33%';
       }
       infodiv.onmouseleave=function(){
         infodiv_info.style.display="none";
-        infodiv.style.width='10%';
+        //infodiv.style.width='max-content';
       }
       animate();
       infodiv_info.innerHTML+="<br/>City generation...";
     }
 
     function animate(){
-      timer+=1;
+      if (!paused) timer+=1;
       set_height_width_vars();
       reset_background();
       if (cityarranging){ normalizecityforces(); actuponcityforces();}      
       if (peoplearranging && (peoplegenerated==false)) {populate();}
       if (peoplegenerated && !controlpanelcreated) {controlpaneldiv();controlpanelcreated=true}      
       drawcities();
-      movepeople(peopleA,statA);movepeople(peopleB,statB);
+      if (!paused) {movepeople(peopleA,statA);movepeople(peopleB,statB);}
       drawpeople();
-      if ((timer % 10==0)&&(initinfection)&&(initinfectcount<5)) {startinfections();}
-      progressinfections(peopleA,statA);
-      progressinfections(peopleB,statB);
-      vaccinateandboost(peopleA);//not B! A only, B is the crazy folks!
+      dofollowdetails();
+      if (!paused) {
+        if ((timer % 10==0)&&(initinfection)&&(initinfectcount<5)) {startinfections();}
+        progressinfections(peopleA,statA);
+        progressinfections(peopleB,statB);
+        vaccinateandboost(peopleA);//not B! A only, B is the crazy folks!
+      }
       requestAnimFrame(animate);
       if (dovaccinations) document.getElementById("vstart").disabled=true;
-      if (domasks) document.getElementById("mstart").disabled=true;
     }
 
 
@@ -237,6 +258,76 @@
       ctx.fillText("H", tlx(cities[maxcities-1].x), tly(cities[maxcities-1].y+0.555));
     }
 
+    function followperson(){
+      followingperson=Object.assign({},personundermouse);
+    }
+
+    lgray=rgbToHex(90,90,90)
+    function dofollowdetails(){
+      persondetails="";
+      if (followingperson.ab==-1) {
+        document.getElementById("maininfoareapersonal").innerHTML="Not following anyone";
+        return;
+      }
+      if (followingperson.ab==0) worldsafe="This world follows precautions";
+      if (followingperson.ab==1) worldsafe="This world ignores precautions";
+      pidx=followingperson.n
+      if (followingperson.ab==0) person=peopleA[pidx]
+      if (followingperson.ab==1) person=peopleB[pidx]
+      personorigin=person.scity;
+      persontravelinfo="";
+      personvisitinfo="";
+      persongoingto=person.stcity;
+      if (persongoingto==maxcities-1) persongoingto="Hospital";
+      if (person.stcity >=0) {
+        persontravelinfo=("P-"+pidx)+" is "+ ((person.stprogress*100).toFixed())+"% way to "+persongoingto;
+        personvisitinfo=" - "+(person.stduration.toFixed()-timer)+" time left";
+        if (person.sreturning){
+          persontravelinfo=("P-"+pidx)+" is "+ ((-person.stprogress*100).toFixed())+"% way from "+persongoingto;
+          personvisitinfo="";
+        }
+      } else {
+        persontravelinfo=("P-"+pidx)+ " is not travelling";
+      }
+      sicklevel=person.phase[0];
+      if (sicklevel==0) sickstate="Healthy";
+      phasetime=0;
+      if (sicklevel==1) {sickstate="Getting sick";phasetime=person.ssick_timetillcontagious}
+      if (sicklevel==2) {sickstate="Sick";phasetime=person.ssick_timetillbad}
+      if (sicklevel==3) {sickstate="Dying";phasetime=person.ssick_timetilldead}
+      if (sicklevel==4) {sickstate="Serious but won't die";phasetime=person.ssick_timebad2sick}
+      if (sicklevel==5) {sickstate="Getting over it";phasetime=person.ssick_timetillwell}
+      nextsickstate="";
+      if (person.phase.length>1) {
+        pnextphase=person.phase[1]
+        if (pnextphase==0) nextsickstate=", getting healthy";
+        if (pnextphase==1) nextsickstate=", getting sick";
+        if (pnextphase==2) nextsickstate=", will be contagious";
+        if (pnextphase==3) nextsickstate=", will perish";
+        if (pnextphase==4) nextsickstate=", will be serious";
+        if (sicklevel==5) nextsickstate=", will be OK";
+      }
+      if (sicklevel==3) nextsickstate=" needs medical help"
+      phasetimephrase="";
+      if (phasetime>0){
+        phasetimephrase=" ("+phasetime.toFixed(2)+")";
+      }
+      sickstate+=nextsickstate+phasetimephrase;
+
+      pdetail=worldsafe+"<br/>"+persontravelinfo+" "+personvisitinfo;
+      pdetail=pdetail+"<br/>"+sickstate;
+      pdetail=pdetail+"<br/>Resistance level - "+person.resist.toFixed(3);
+      document.getElementById("maininfoareapersonal").innerHTML=pdetail;
+      //linehere
+      px=person.sx;
+      py=person.sy;
+      if (followingperson.ab>=0) {
+        if (followingperson.ab==0) ofst=+0.5;
+        if (followingperson.ab==1) ofst=-0.5;
+        drawline(tlx(-1),tly(py-ofst),tlx(+1),tly(py-ofst),lgray,1);
+        drawline(tlx(px),tly(0),tlx(px),tly(-ofst*2),lgray,1);
+      }
+    }
 
     var pcol1=rgbToHex(10,10,10);
     var pcol1t=rgbToHex(0,180,0);
@@ -245,6 +336,7 @@
     var pcol2_sik=rgbToHex(245,120,100);
     var pcol2_wel=rgbToHex(245,120,200);
     var pcol2_bad=rgbToHex(255,0,0);
+    var pcol2_HL=rgbToHex(255,255,255);
     function drawperson(px,py,travelling,sickphase,other){
       ctx.beginPath();
       ctx.lineWidth=2;
@@ -253,27 +345,29 @@
       pcolor=pcol2;
       if (sickphase==1) pcolor=pcol2_inf;
       if (sickphase==2 || sickphase==4 || sickphase==5) pcolor=pcol2_sik;
-      if (sickphase==3) pcolor=pcol2_bad;      
+      if (sickphase==3) pcolor=pcol2_bad;
+      if (dist(px,py,mousePos.x,mousePos.y)<squarescaler/90) pcolor=pcol2_HL;
       ctx.fillStyle=pcolor;
       ctx.arc(px, py, squarescaler/150, 0, 2 * Math.PI);
-      if (dist(px,py,mousePos.x,mousePos.y)<3) return true;
       ctx.stroke();
       ctx.fill();
-      /*ctx.fillStyle=rgbToHex(0,0,0);  //useful over head debug text thing
+      ctx.fillStyle=rgbToHex(0,0,0);  //useful over head debug text thing
       ctx.textAlign = "center";
       Hsize=squarescaler/500;
       ctx.font = Hsize+"em Consolas";
-      ctx.fillText(other, px, py-squarescaler/70);*/ 
+      ctx.fillText(other, px, py-squarescaler/70);
+      if (dist(px,py,mousePos.x,mousePos.y)<squarescaler/90) return true;
     }
+
     function drawpeople(){
+      personundermouse={"n":-1,"ab":-1};
       for (let pidx = 0; pidx < peopleA.length; pidx++){
         stpx=tlx(peopleA[pidx].sx);
         stpy=tly(peopleA[pidx].sy);
         utpx=tlx(peopleB[pidx].sx);
         utpy=tly(peopleB[pidx].sy);
         puma=false;
-        pumb=false;
-        personundermouse={"n":-1,"ab":-1}
+        pumb=false;        
         if (peopleA[pidx].salive) puma=drawperson(stpx,stpy-squarescaler/2,peopleA[pidx].stprogress,peopleA[pidx].phase[0],"");
         if (peopleB[pidx].salive) pumb=drawperson(utpx,utpy+squarescaler/2,peopleB[pidx].stprogress,peopleB[pidx].phase[0],"");
         if (puma) personundermouse={"n":pidx,"ab":0}
@@ -291,8 +385,8 @@
         ctx.fillText("Sick "+statB.infected, tlx(-0.4), tly(+0.03+offset));
         ctx.fillText("Hospitalized "+statA.checkin, tlx(0), tly(-0.03+offset));
         ctx.fillText("Hospitalized "+statB.checkin, tlx(0), tly(+0.03+offset));
-        ctx.fillText("Dead "+statA.dead, tlx(0.4), tly(-0.03+offset));
-        ctx.fillText("Dead "+statB.dead, tlx(0.4), tly(+0.03+offset));
+        ctx.fillText("Passed "+statA.dead, tlx(0.4), tly(-0.03+offset));
+        ctx.fillText("Passed "+statB.dead, tlx(0.4), tly(+0.03+offset));
       }
     }
 
@@ -311,6 +405,7 @@
 
     function movepeople(people,stat){
       stat.checkin=0;
+
       for (let pidx = 0; pidx < people.length; pidx++){
         if (people[pidx].salive){
           person=people[pidx];
@@ -319,17 +414,26 @@
           person.sx=sxy.x;
           person.sy=sxy.y;
           if (person.stcity>-1) {
-            if (person.stprogress>0 && person.stcity==maxcities-1){
+            if (person.stprogress>=1 && person.stcity==maxcities-1){//if person is AT hospital
               stat.checkin+=1;
             }
             if ((person.stprogress<1)&&(person.stduration>timer)&&(!person.hospitalized)&&(person.stcity<maxcities-1)){
               person.stprogress+=0.005;
             }
-            if ((person.stprogress<1)&&(person.stduration>timer)&&(person.hospitalized)&&(person.stcity==maxcities-1)){
-              person.stprogress+=0.005;
-              if (stat.checkin>Hospitalmax) {
+            if ((person.stprogress<1)&&(person.stduration>timer)&&(person.hospitalized)&&person.stcity==maxcities-1){
+              if (stat.checkin<Hospitalmax) person.stprogress+=0.005;
+            }
+            if ((person.stprogress>0)&&person.stcity==maxcities-1){
+              if (stat.checkin>Hospitalmax) { //need to turn away person
+                person.stduration=timer-1;
                 person.sreturning=true;
-                person.stduration=timer;
+                person.hospitalized=false;
+                disease=diseases[person.sdisease]
+                person.timetohospital=disease.gethelp_min+Math.random()*(disease.gethelp_max-disease.gethelp_min);
+                person.timeinhospital=0;
+              } else {
+                if (person.stprogress>=1) person.timeinhospital+=1;
+
               }
             }
             if ((person.stprogress>0)&&(person.stduration<timer)){
@@ -342,10 +446,11 @@
             stxy=calc_personxy(person.stcity, person.soffset, person.srv, person.sr, person.sr2, person.sradoffset, person.soffset);
             person.sx=sxy.x*(1-person.stprogress)+stxy.x*person.stprogress;
             person.sy=sxy.y*(1-person.stprogress)+stxy.y*person.stprogress;
-            if ((person.stprogress<=0)&&(person.sreturning)) {
+            if ((person.stprogress<=0)&&(person.sreturning)) { //return logic
               if (person.stcity == maxcities-1 && person.sdisease>=0) {
                 disease=diseases[person.sdisease];
                 person.timetohospital=disease.gethelp_min+Math.random()*(disease.gethelp_max-disease.gethelp_min);
+                person.timeinhospital=0;
               }
               person.stprogress=0;
               person.sreturning=false;
@@ -353,29 +458,25 @@
             }
           }
 
-          if ((person.stcity==-1)&&(person.hospitalized)){
+          if (person.stcity==-1 && person.hospitalized && person.stprogress<=0){
             person.stcity=maxcities-1;
-            duration=timer+Math.random()*2000+220;          
-            person.stprogress=0;
+            duration=timer+Math.random()*2000+220;
             person.stduration=duration;
           }
 
           cantravel=true;
           if (dotravelrestriction && person.travelanyway<travelrestrictiveness) cantravel=false;
-          if (person.travelchance > Math.random()*2000 && cantravel){
-            if (person.stcity==-1){
-              traveltocity=Math.floor(Math.random()*(maxcities-1));
-              duration=timer+Math.random()*2000+220;
-              if (traveltocity !== person.scity){
-                person.stcity=traveltocity;
-                person.stprogress=0;
-                person.stduration=duration;
-              }
+          if (person.travelchance > Math.random()*2000 && cantravel && person.stcity==-1){
+            traveltocity=Math.floor(Math.random()*(maxcities-1));
+            duration=timer+Math.random()*2000+220;
+            if (traveltocity !== person.scity){
+              person.stcity=traveltocity;
+              person.stprogress=0;
+              person.stduration=duration;
             }
           }
         }
       }
-      if (stat.checkin>Hospitalmax) stat.checkin=Hospitalmax;
     }
 
     function createdisease(){
@@ -408,6 +509,10 @@
       return disease;
     }
 
+    function inbetween(a,b,v){
+      return (1-v)*a+v*b;
+    }
+
     function infectperson(pn,dn,peoplearray,stat){
       /*
       Phases
@@ -438,20 +543,13 @@
         person.ssick_timetilldead=disease.timetilldeath_min+Math.random()*(disease.timetilldeath_max-disease.timetilldeath_min);
         person.ssick_timebad2sick=disease.timebad2sick_min+Math.random()*(disease.timebad2sick_max-disease.timebad2sick_min);
         person.timetohospital=disease.gethelp_min+Math.random()*(disease.gethelp_max-disease.gethelp_min);
-
         person.ssick_timetillwell=person.ssick_timetillwell*resistancetimefactor;
         person.ssick_timebad2sick=person.ssick_timebad2sick*resistancetimefactor;
 
         chancebad=false;
         chancedeath=false;
-        if (!person.svac) {
-          chancedeath=Math.random()<disease.killrate;
-          chancebad=chancedeath||Math.random()<disease.badrate; // if death, then must get bad
-        } else {
-          chancedeath=Math.random()<disease.killrate_vaccinated;
-          if (person.resist>Math.random()) chancedeath=false
-          chancebad=chancedeath||Math.random()<disease.badrate_vaccinated; // if death, then must get bad
-        }
+        chancedeath=Math.random()<inbetween(disease.killrate,disease.killrate_vaccinated,person.resist);
+        chancebad=chancedeath||Math.random()<inbetween(disease.badrate,disease.badrate_vaccinated,person.resist);; // if death, then must get bad        
 
         person.phase=[1] //getting sick
         if (chancebad) person.phase=person.phase.concat(2) //getting bad
@@ -459,6 +557,16 @@
         if (chancebad) person.phase=person.phase.concat(4) //bad to OK
         person.phase=person.phase.concat(5) //ok to well
 
+      }
+    }
+
+    function masktoggle(){
+      if (domasks) {
+        domasks=false;
+        document.getElementById("mstart").innerHTML="Masks";
+      } else {
+        domasks=true;
+        document.getElementById("mstart").innerHTML="UnMask";
       }
     }
 
@@ -513,11 +621,12 @@
             person.stcity=-1;
             person.stprogress=0;
           }
+
           if ((person.phase[0]==3 || person.phase[0]==4) && person.timetohospital<=0 && !person.hospitalized && stat.checkin<Hospitalmax) {
             stat.hospitalized+=1;
             person.hospitalized=true;
           }
-          if (person.phase[0]==3 && person.hospitalized && person.stcity==maxcities-1 && person.stprogress>=1 && person.carecheck==false) {
+          if (person.phase[0]==3 && person.hospitalized && person.stcity==maxcities-1 && person.stprogress>=1 && person.carecheck==false && person.timeinhospital>=100) {
             /*if person would die without help
             chance of death is k, chance with care is c
             as everyone in this conditional suceeded k, chance death now is c/k 
@@ -529,14 +638,9 @@
             person.carecheck=true;
             disease=diseases[person.sdisease];
             if (!person.svac) {
-              chancedeath=(disease.killrate_withcare/disease.killrate)
-              if (chancedeath<Math.random()){
-                //don't die, add time for phase 3 to phase 4 and remove phase 3
-                person.ssick_timebad2sick+=person.ssick_timetilldead;
-                person.phase=person.phase.slice(1);
-              }
-            } else {
-              chancedeath=(disease.killrate_vaccinatedwithcare/disease.killrate_vaccinated)
+              chancedeathnovac=(disease.killrate_withcare/disease.killrate)
+              chancedeathvac=(disease.killrate_vaccinatedwithcare/disease.killrate_vaccinated)
+              chancedeath=inbetween(chancedeathnovac,chancedeathvac,person.resist)
               if (chancedeath<Math.random()){
                 //don't die, add time for phase 3 to phase 4 and remove phase 3
                 person.ssick_timebad2sick+=person.ssick_timetilldead;
@@ -562,7 +666,9 @@
             person.ssick_timetillcontagious=-1;
             person.ssick_timetillwell=-1;
             person.timetohospital=-1;
-            person.hospitalized=false;
+            if (person.hospitalized) {
+              person.hospitalized=false;
+            }
             person.carecheck=false;
             person.vaccinedelay=vaccineavgdelay*falsegamma(midptstretch,curvetune);
           }
@@ -783,6 +889,7 @@
           person.ssick_timetillwell=-1;
           person.ssick_timetilldead=-1;
           person.timetohospital=-1;
+          person.timeinhospital=0;
           person.hospitalized=false;
           person.carecheck=false; //checked if hospital will save them
           person.svac=false;
@@ -825,8 +932,6 @@
     }
 
     function paint(cnvname){
-      mcanvas = document.getElementById(cnvname);
-      ctx = mcanvas.getContext('2d');
       initstuff();
     }
 
@@ -861,7 +966,7 @@
       startinfection="<button type=\"button\" name=\"istart\" id=\"istart\" onclick=\"initinfection=true;\">Infect...</button>";
       vaccinebhtml="<button type=\"button\" name=\"vstart\" id=\"vstart\" onclick=\"dovaccinations=true;\">Vaccinate</button>";
       
-      maskbhtml="<button type=\"button\" name=\"mstart\" id=\"mstart\" onclick=\"domasks=true;\">Masks</button>";
+      maskbhtml="<button type=\"button\" name=\"mstart\" id=\"mstart\" onclick=\"masktoggle()\">Masks</button>";
       
       rate_I=slider("Infection Rate","irate",0,1,0.01);
       rate_B=slider("Serious %","brate",0,1,0.01);
@@ -879,8 +984,8 @@
       time2wlmax_html=slider("Time to well max","time2wlmax",1,100,1);
       time2hcmin_html=slider("Wait for help min","time2hcmin",1,100,1);
       time2hcmax_html=slider("Wait for help max","time2hcmax",1,100,1);
-      rate_vac_html=slider("Vaccine Chance","vrate",0,1,0.01);
-      rate_msk_html=slider("Mask Chance","mrate",0,1,0.01);
+      rate_vac_html=slider("Vaccine acceptance","vrate",0,1,0.01);
+      rate_msk_html=slider("Mask acceptance","mrate",0,1,0.01);
 
       infodiv_info.innerHTML= "<br/>"+startinfection+vaccinebhtml+maskbhtml+"<br/>"+
       rate_I+
@@ -901,13 +1006,11 @@
       time2hcmax_html+
       rate_vac_html+
       rate_msk_html+
-      "";
+      "<br/>";
       controlpanelcreated=true;
       slideinit("irate",diseases[0].spreadability*60,function(){diseases[0].spreadability=document.getElementById("irate").value/60});
-      slideinit("brate",diseases[0].badrate        ,function(){diseases[0].badrate     =document.getElementById("brate").value;
-      document.getElementById("drate").max=document.getElementById("brate").max;
-      });
-      slideinit("drate",diseases[0].killrate        ,function(){diseases[0].killrate     =document.getElementById("drate").value});
+      slideinit("brate",diseases[0].badrate,function(){diseases[0].badrate=document.getElementById("brate").value;});
+      slideinit("drate",diseases[0].killrate,function(){diseases[0].killrate=document.getElementById("drate").value;});
       slideinit("drateh",diseases[0].killrate_withcare,function(){diseases[0].killrate_withcare=document.getElementById("drateh").value});
       slideinit("dratev",diseases[0].killrate_vaccinated,function(){diseases[0].killrate_vaccinated=document.getElementById("dratev").value});
       slideinit("dratehv",diseases[0].killrate_vaccinatedwithcare,function(){diseases[0].killrate_vaccinatedwithcare=document.getElementById("dratehv").value});
@@ -921,7 +1024,6 @@
       slideinit("time2wlmax",diseases[0].timetillwell_max,function(){diseases[0].timetillwell_max=document.getElementById("time2wlmax");diseases[0].timebad2sick_max=document.getElementById("time2wlmin")});
       slideinit("time2hcmin",diseases[0].gethelp_min,function(){diseases[0].gethelp_min=document.getElementById("time2hcmin")});
       slideinit("time2hcmax",diseases[0].gethelp_max,function(){diseases[0].gethelp_max=document.getElementById("time2hcmax")});
-
       slideinit("vrate",vaccinelikeliness,function(){vaccinelikeliness=document.getElementById("vrate")});
       slideinit("mrate",masklikeliness,function(){masklikeliness=document.getElementById("mrate")});
     }
@@ -955,7 +1057,7 @@
           infodiv_drag.onmousedown = statusdragMouseDown;
     }
 
-    function getMousePos(canvas, evt) {
+    function getMousePos(canvas, evt) {//specific to canvas
       var rect = canvas.getBoundingClientRect();
       return {
         x: evt.clientX - rect.left,
@@ -964,7 +1066,7 @@
     }
   </script>
 
-  <body onload='paint("mcanvas")'>
+  <body onload='initstuff()'>
 	<div><canvas id="mcanvas"></canvas></div>
   <div id="details_main" style="
         position: absolute;
@@ -973,10 +1075,11 @@
         background-color: #600000;color:#ffffff;
         font-size: 1em;font-family: 'Courier New', Courier, monospace;
   ">
-  <div id="details" style="background-color:#900000;width:100%;color:#ffffff;float:left;Text-align:center">[drag]</div>
+  <div id="details" style="background-color:#900000;width:max-content;color:#ffffff;float:left;Text-align:center">---------[drag and expand, space to pause]---------</div>
   <div id="maininfoarea" style="width:100%;height:100%;float:right;">
     Starting...
   </div>
+  <div id="maininfoareapersonal" style="width:100%;height:100%;float:right;">Click to follow person</div>
   </div>
   </body>
 </html>
