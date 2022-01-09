@@ -425,12 +425,18 @@
             }
             if ((person.stprogress>0)&&person.stcity==maxcities-1){
               if (stat.checkin>Hospitalmax) { //need to turn away person
-                person.stduration=timer-1;
-                person.sreturning=true;
-                person.hospitalized=false;
-                disease=diseases[person.sdisease]
-                person.timetohospital=disease.gethelp_min+Math.random()*(disease.gethelp_max-disease.gethelp_min);
-                person.timeinhospital=0;
+                if (person.sdisease>=0){
+                  person.stduration=timer-1;
+                  person.sreturning=true;
+                  person.hospitalized=false;
+                  disease=diseases[person.sdisease]
+                  person.timetohospital=disease.gethelp_min+Math.random()*(disease.gethelp_max-disease.gethelp_min);                
+                  person.timeinhospital=0;
+                } else { //person got well on the way to hospital
+                  person.stduration=timer-1;
+                  person.sreturning=true;
+                  person.hospitalized=false;
+                }
               } else {
                 if (person.stprogress>=1) person.timeinhospital+=1;
 
