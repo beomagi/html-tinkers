@@ -176,8 +176,6 @@
       infodiv.style.width='min-content';
       dragstatuswindow(infodiv_drag);
       setupcities();
-      disease=createdisease();
-      diseases.push(disease);
 
       document.addEventListener('keydown', function(evt){keypressed(evt)}, false);
       mcanvas.addEventListener('mousedown', function(evt) {
@@ -752,6 +750,10 @@
       paused=false;
       timer=0;
       maxcities=3+Math.floor(Math.random()*8);
+      diseases=[];
+      disease=createdisease();
+      diseases.push(disease);
+
       //maxcities=8;
       citycount=3+Math.floor(Math.random()*(maxcities-2));
       for (let cidx = 0; cidx < maxcities; cidx++) {
@@ -867,7 +869,6 @@
     }
 
     function populate(){
-      infodiv_info.innerHTML+="<br/>Populating...";
       peopleA=[];
       peopleB=[];
       statA.alive=0;
@@ -882,7 +883,9 @@
       peoplegenerated=false;
       peoplearranging=false;
       initinfectcount=0;
-
+      dovaccinations=false;
+      initinfection=false;
+      controlpanelcreated=false;
       for (let cidx = 0; cidx < maxcities-1; cidx++) {
         popcount=Math.pow(cities[cidx].r,2)*2000;
         popcount=popcount*(Math.random()*0.5+0.5);//limit density randomly
@@ -938,6 +941,7 @@
       phase+=1;
       peoplegenerated=true;
       peoplearranging=false;
+      
     }
 
     function set_height_width_vars(){
@@ -1003,9 +1007,10 @@
       //ctrlpanel=document.createElement("div");
       startinfection="<button type=\"button\" name=\"istart\" id=\"istart\" onclick=\"initinfection=true;\">Infect...</button>";
       vaccinebhtml="<button type=\"button\" name=\"vstart\" id=\"vstart\" onclick=\"dovaccinations=true;\">Vaccinate</button>";
-      
       maskbhtml="<button type=\"button\" name=\"mstart\" id=\"mstart\" onclick=\"masktoggle()\">Masks</button>";
-      
+      repopulatebhtml="<button type=\"button\" name=\"pbutt\" id=\"pbutt\" onclick=\"populate()\">Repopulate</button>";
+      redocitiesbhtml="<button type=\"button\" name=\"cbutt\" id=\"cbutt\" onclick=\"setupcities()\">Recreate Groups</button>";
+
       rate_I=slider("Infection Rate","irate",0,1,0.01);
       rate_B=slider("Serious %","brate",0,1,0.01);
       rate_D=slider("Death %","drate",0,1,0.01);
@@ -1025,7 +1030,7 @@
       rate_vac_html=slider("Vaccine acceptance","vrate",0,1,0.01);
       rate_msk_html=slider("Mask acceptance","mrate",0,1,0.01);
 
-      infodiv_info.innerHTML= "<br/>"+startinfection+vaccinebhtml+maskbhtml+"<br/>"+
+      infodiv_info.innerHTML= "<br/>"+startinfection+vaccinebhtml+maskbhtml+"&nbsp;"+repopulatebhtml+redocitiesbhtml+"<br/>"+
       rate_I+
       rate_B+
       rate_D+
@@ -1095,6 +1100,8 @@
       "This delay is an approximation using the average vaccination delay(todo:add slider) using "+
       "m=tan(r*pi/2)^0.1 to curve uniform distribution \"r\" (0-1) into \"faked gamma\" distribution \"m\" (0-infinity).");
       tooltip_slide("mrate","Everyone generated has a uniform random value for their willingness to weak masks. If it's less that this value, they will wear masks.");
+      document.getElementById("istart").disabled=false;
+      document.getElementById("vstart").disabled=false;
     }
 
     //////////////modified from https://www.w3schools.com/howto/howto_js_draggable.asp////////////////
