@@ -73,7 +73,7 @@
     var move=0;
     var direction=0.001;
     var mousePos={"x":0,"y":0};
-    var paused=false;
+    var paused=1;
     //info div
     var infodiv=null;
     var infodiv_drag=null;
@@ -157,11 +157,12 @@
     function tly(yv){ return (yv*squarescaler)+midheight; }
 
     function pausefunction(){
-      paused=!paused;
+      paused=(paused+1)%4;
     }
 
     function keypressed(keyevt){
       if (keyevt.keyCode==32) pausefunction();
+      if (keyevt.keyCode==80) {paused=0;};
     }
 
     function initstuff(){
@@ -198,17 +199,18 @@
     }
 
     function animate(){
-      if (!paused) timer+=1;
+      
       set_height_width_vars();
       reset_background();
       if (cityarranging){ normalizecityforces(); actuponcityforces();}      
       if (peoplearranging && (peoplegenerated==false)) {populate();}
       if (peoplegenerated && !controlpanelcreated) {controlpaneldiv();controlpanelcreated=true}      
       drawcities();
-      if (!paused) {movepeople(peopleA,statA);movepeople(peopleB,statB);}
       drawpeople();
-      dofollowdetails();
-      if (!paused) {
+      for (let ff=0; ff<paused; ff+=1){
+        dofollowdetails();
+        timer+=1;
+        movepeople(peopleA,statA);movepeople(peopleB,statB);
         if ((timer % 10==0)&&(initinfection)&&(initinfectcount<5)) {startinfections();}
         progressinfections(peopleA,statA);
         progressinfections(peopleB,statB);
@@ -749,7 +751,7 @@
       peoplearranging=false;
       peoplegenerated=false;
       initinfection=false;
-      paused=false;
+      paused=1;
       timer=0;
       maxcities=3+Math.floor(Math.random()*8);
       diseases=[];
