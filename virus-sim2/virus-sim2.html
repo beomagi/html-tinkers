@@ -207,8 +207,8 @@
       if (peoplegenerated && !controlpanelcreated) {controlpaneldiv();controlpanelcreated=true}      
       drawcities();
       drawpeople();
+      dofollowdetails();
       for (let ff=0; ff<paused; ff+=1){
-        dofollowdetails();
         timer+=1;
         movepeople(peopleA,statA);movepeople(peopleB,statB);
         if ((timer % 10==0)&&(initinfection)&&(initinfectcount<5)) {startinfections();}
